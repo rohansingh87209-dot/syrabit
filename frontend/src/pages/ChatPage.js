@@ -22,8 +22,8 @@ const API_BASE = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
 
 // ── Models (Groq) ─────────────────────────────────────────────────────────────
 const MODELS = [
-  { value: 'qwen/qwen3-32b',          label: 'Syrabit MLM', badge: '🧠 Smart' },
   { value: 'llama-3.3-70b-versatile', label: 'Syrabit SLM', badge: '⚡ Fast'  },
+  { value: 'qwen/qwen3-32b',          label: 'Syrabit MLM', badge: '🔜 Coming Soon', disabled: true },
 ];
 
 // ── Bubble animation variants ─────────────────────────────────────────────────
@@ -226,7 +226,7 @@ export default function ChatPage() {
   const [input, setInput]                 = useState('');
   const [isLoading, setIsLoading]         = useState(false);
   const [conversationId, setConversationId] = useState(convId || null);
-  const [model, setModel]                 = useState('qwen/qwen3-32b');
+  const [model, setModel]                 = useState('llama-3.3-70b-versatile');
   const [subject, setSubject]             = useState(null);
   const [scopedChapters, setScopedChapters] = useState([]);
   const [credits, setCredits]             = useState({ used: user?.credits_used || 0, limit: user?.credits_limit || 0 });
@@ -462,7 +462,11 @@ export default function ChatPage() {
         >
           <img src="/logo.png" alt="" className="w-4 h-4 rounded-sm" />
           <span>{modelLabel.label}</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{modelLabel.badge.replace(/[🧠⚡]\s*/, '')}</span>
+          {!modelLabel.disabled && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+              {modelLabel.badge.replace(/[🧠⚡🔜]\s*/, '')}
+            </span>
+          )}
           <ChevronDown size={14} className={`text-muted-foreground transition-transform ${showModelMenu ? 'rotate-180' : ''}`} />
         </button>
         {showModelMenu && (
@@ -473,17 +477,39 @@ export default function ChatPage() {
             {MODELS.map((m) => (
               <button
                 key={m.value}
-                onClick={() => { setModel(m.value); setShowModelMenu(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent/40 transition-colors ${
+                onClick={() => { 
+                  if (!m.disabled) {
+                    setModel(m.value); 
+                    setShowModelMenu(false);
+                  }
+                }}
+                disabled={m.disabled}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${
+                  m.disabled 
+                    ? 'opacity-50 cursor-not-allowed bg-muted/20' 
+                    : 'hover:bg-accent/40'
+                } ${
                   model === m.value ? 'text-primary font-semibold bg-primary/5' : 'text-foreground'
                 }`}
               >
                 <img src="/logo.png" alt="" className="w-5 h-5 rounded-sm flex-shrink-0" />
                 <div className="flex flex-col items-start flex-1 min-w-0">
-                  <span className="truncate">{m.label}</span>
-                  <span className="text-[10px] text-muted-foreground">{m.badge.replace(/[🧠⚡]\s*/, '') === 'Smart' ? 'Best for complex problems, deep reasoning' : 'Best for quick Q&A, fastest responses'}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="truncate">{m.label}</span>
+                    {m.disabled && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-medium">
+                        Coming Soon
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-muted-foreground">
+                    {m.disabled 
+                      ? 'Advanced model launching soon' 
+                      : (m.badge.replace(/[🧠⚡🔜]\s*/, '') === 'Fast' ? 'Best for quick Q&A, fastest responses' : 'Best for complex problems, deep reasoning')
+                    }
+                  </span>
                 </div>
-                {model === m.value && <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
+                {model === m.value && !m.disabled && <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
               </button>
             ))}
           </div>

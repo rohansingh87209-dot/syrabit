@@ -427,25 +427,32 @@ export default function ProfilePage() {
           </div>
           <div className="p-4 space-y-3">
             {[
-              { name: 'Syrabit SLM Instant', badge: 'Fast', stars: 4, dots: 4, dotColor: 'bg-emerald-500', desc: 'Best for quick Q&A, fastest responses' },
-              { name: 'Syrabit MLM Versatile', badge: 'Smart', stars: 5, dots: 3, dotColor: 'bg-violet-500', desc: 'Best for complex problems, deep reasoning' },
+              { name: 'Syrabit SLM Instant', badge: 'Fast', stars: 4, dots: 4, dotColor: 'bg-emerald-500', desc: 'Best for quick Q&A, fastest responses', available: true },
+              { name: 'Syrabit MLM Versatile', badge: 'Coming Soon', stars: 5, dots: 0, dotColor: 'bg-muted', desc: 'Advanced model launching soon', available: false },
             ].map((m) => (
               <div key={m.name} className="flex items-center gap-3 p-3 rounded-xl"
-                style={{ background: 'rgba(124,58,237,0.04)', border: '1px solid rgba(139,92,246,0.10)' }}>
+                style={{ 
+                  background: m.available ? 'rgba(124,58,237,0.04)' : 'rgba(100,100,100,0.04)', 
+                  border: m.available ? '1px solid rgba(139,92,246,0.10)' : '1px solid rgba(150,150,150,0.10)',
+                  opacity: m.available ? 1 : 0.6
+                }}>
                 <LogoMark size="xs" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-foreground">{m.name}</span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full"
-                      style={{ background: 'rgba(139,92,246,0.12)', color: 'hsl(var(--primary))' }}>
+                      style={{ 
+                        background: m.available ? 'rgba(139,92,246,0.12)' : 'rgba(245,158,11,0.12)', 
+                        color: m.available ? 'hsl(var(--primary))' : 'rgb(245,158,11)' 
+                      }}>
                       {m.badge}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground/60 truncate mt-0.5">{m.desc}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                  <StarRating value={m.stars} />
-                  <UsageDots value={m.dots} dotColor={m.dotColor} />
+                  {m.available && <StarRating value={m.stars} />}
+                  {m.available && <UsageDots value={m.dots} dotColor={m.dotColor} />}
                 </div>
               </div>
             ))}

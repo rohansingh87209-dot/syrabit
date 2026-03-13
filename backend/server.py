@@ -1070,6 +1070,170 @@ def _extract_keywords(query: str) -> list:
     return [w for w in raw if len(w) >= 3 and w not in stop_words][:6]
 
 
+# ─────────────────────────────────────────────
+# AUTO-CHUNKING FOR RAG
+# ─────────────────────────────────────────────
+
+async def auto_chunk_content(chapter_id: str, content: str, subject_id: str = None) -> list:
+    """
+    Automatically split chapter content into searchable chunks.
+    
+    Strategy:
+    - Split by double newlines (paragraphs)
+    - Each chunk: 100-800 chars (optimal for RAG)
+    - Extract keywords for each chunk
+    - Store in 'chunks' collection for fast retrieval
+    
+    Returns: List of created chunk IDs
+    """
+    if not content or len(content.strip()) < 100:
+        logger.warning(f"Content too short for chunking (chapter {chapter_id}): {len(content)} chars")
+        return []
+    
+    # Clean content
+    content = content.strip()
+    
+    # Split by double newlines (paragraphs) or single newlines if no double
+    paragraphs = []
+    if '\n\n' in content:
+        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+    else:
+        # Fallback: split by single newline and group into chunks
+        lines = [l.strip() for l in content.split('\n') if l.strip()]
+        current_chunk = []
+        for line in lines:
+            current_chunk.append(line)
+            if len(' '.join(current_chunk)) > 400:
+                paragraphs.append(' '.join(current_chunk))
+                current_chunk = []
+        if current_chunk:
+            paragraphs.append(' '.join(current_chunk))
+    
+    if not paragraphs:
+        # No clear structure, split by sentences
+        import re
+        sentences = re.split(r'(?<=[.!?])\s+', content)
+        paragraphs = []
+        current = []
+        for sent in sentences:
+            current.append(sent)
+            if len(' '.join(current)) > 300:
+                paragraphs.append(' '.join(current))
+                current = []
+        if current:
+            paragraphs.append(' '.join(current))
+    
+    # Create chunks
+    chunks_created = []
+    for i, para in enumerate(paragraphs):
+        para_clean = para.strip()
+        
+        # Skip very short paragraphs (less than 50 chars)
+        if len(para_clean) < 50:
+            continue
+        
+        # If paragraph is too long, split it further
+        if len(para_clean) > 800:
+            # Split into smaller chunks of ~400 chars at sentence boundaries
+            import re
+            sentences = re.split(r'(?<=[.!?])\s+', para_clean)
+            sub_chunk = []
+            for sent in sentences:
+                sub_chunk.append(sent)
+                if len(' '.join(sub_chunk)) > 400:
+                    chunk_text = ' '.join(sub_chunk).strip()
+                    if len(chunk_text) >= 50:
+                        # Extract keywords for this chunk
+                        chunk_keywords = _extract_keywords(chunk_text)
+                        
+                        chunk = {
+                            "id": str(uuid.uuid4()),
+                            "chapter_id": chapter_id,
+                            "subject_id": subject_id,
+                            "content": chunk_text,
+                            "content_type": "notes",
+                            "chunk_index": len(chunks_created),
+                            "tags": chunk_keywords[:5],
+                            "char_count": len(chunk_text),
+                            "created_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                        await db.chunks.insert_one(chunk)
+                        chunks_created.append(chunk["id"])
+                    sub_chunk = []
+            
+            # Add remaining
+            if sub_chunk:
+                chunk_text = ' '.join(sub_chunk).strip()
+                if len(chunk_text) >= 50:
+                    chunk_keywords = _extract_keywords(chunk_text)
+                    chunk = {
+                        "id": str(uuid.uuid4()),
+                        "chapter_id": chapter_id,
+                        "subject_id": subject_id,
+                        "content": chunk_text,
+                        "content_type": "notes",
+                        "chunk_index": len(chunks_created),
+                        "tags": chunk_keywords[:5],
+                        "char_count": len(chunk_text),
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                    }
+                    await db.chunks.insert_one(chunk)
+                    chunks_created.append(chunk["id"])
+        else:
+            # Paragraph is good size, create chunk
+            chunk_keywords = _extract_keywords(para_clean)
+            
+            chunk = {
+                "id": str(uuid.uuid4()),
+                "chapter_id": chapter_id,
+                "subject_id": subject_id,
+                "content": para_clean,
+                "content_type": "notes",
+                "chunk_index": i,
+                "tags": chunk_keywords[:5],
+                "char_count": len(para_clean),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            await db.chunks.insert_one(chunk)
+            chunks_created.append(chunk["id"])
+    
+    logger.info(f"Auto-chunked chapter {chapter_id}: {len(chunks_created)} chunks from {len(content)} chars")
+    return chunks_created
+
+
+async def rechunk_chapter(chapter_id: str) -> dict:
+    """
+    Re-chunk an existing chapter (useful after content updates or for existing chapters).
+    Deletes old chunks and creates new ones.
+    """
+    # Get chapter
+    chapter = await db.chapters.find_one({"id": chapter_id}, {"_id": 0})
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    
+    content = chapter.get("content", "")
+    if not content:
+        return {"chapter_id": chapter_id, "chunks_created": 0, "message": "No content to chunk"}
+    
+    # Delete existing chunks for this chapter
+    delete_result = await db.chunks.delete_many({"chapter_id": chapter_id})
+    deleted_count = delete_result.deleted_count
+    
+    # Create new chunks
+    chunks_created = await auto_chunk_content(
+        chapter_id=chapter_id,
+        content=content,
+        subject_id=chapter.get("subject_id")
+    )
+    
+    return {
+        "chapter_id": chapter_id,
+        "chunks_deleted": deleted_count,
+        "chunks_created": len(chunks_created),
+        "message": f"Re-chunked successfully"
+    }
+
+
 async def rag_search(
     query: str,
     subject_id: Optional[str] = None,
@@ -3261,7 +3425,22 @@ async def admin_create_chapter(data: ChapterCreate, admin: dict = Depends(get_ad
         {"$inc": {"chapter_count": 1}, "$set": {"has_document": True}}
     )
     
-    return {k: v for k, v in chap.items() if k != "_id"}
+    # 🆕 AUTO-CHUNK CONTENT
+    chunks_created = []
+    if data.content and len(data.content.strip()) > 100:
+        try:
+            chunks_created = await auto_chunk_content(
+                chapter_id=chapter_id,
+                content=data.content,
+                subject_id=data.subject_id
+            )
+            logger.info(f"✅ Auto-chunked new chapter '{data.title}': {len(chunks_created)} chunks")
+        except Exception as chunk_error:
+            logger.error(f"❌ Auto-chunking failed for chapter {chapter_id}: {chunk_error}")
+    
+    result = {k: v for k, v in chap.items() if k != "_id"}
+    result["chunks_created"] = len(chunks_created)
+    return result
 
 @api.post("/admin/content/chunks")
 async def admin_create_chunk(data: ChunkCreate, admin: dict = Depends(get_admin_user)):
@@ -3603,13 +3782,163 @@ async def delete_content_upload(content_id: str, admin: dict = Depends(get_admin
 
 @api.patch("/admin/content/chapters/{chapter_id}")
 async def admin_update_chapter(chapter_id: str, data: dict, admin: dict = Depends(get_admin_user)):
-    """Update existing chapter"""
+    """Update existing chapter - auto-rechunks if content changed"""
     allowed = {k: v for k, v in data.items() if k in ["title", "description", "content", "order", "status"]}
     allowed["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    # Check if content is being updated
+    content_updated = "content" in allowed and allowed["content"]
+    
     result = await db.chapters.update_one({"id": chapter_id}, {"$set": allowed})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Chapter not found")
-    return {"message": "Chapter updated"}
+    
+    # 🆕 AUTO RE-CHUNK if content was updated
+    chunks_info = {}
+    if content_updated:
+        try:
+            rechunk_result = await rechunk_chapter(chapter_id)
+            chunks_info = {
+                "chunks_deleted": rechunk_result["chunks_deleted"],
+                "chunks_created": rechunk_result["chunks_created"]
+            }
+            logger.info(f"✅ Re-chunked updated chapter {chapter_id}: {chunks_info}")
+        except Exception as chunk_error:
+            logger.error(f"❌ Re-chunking failed for chapter {chapter_id}: {chunk_error}")
+            chunks_info = {"error": str(chunk_error)}
+    
+    return {"message": "Chapter updated", **chunks_info}
+
+@api.post("/admin/content/chapters/{chapter_id}/rechunk")
+async def admin_rechunk_chapter(chapter_id: str, admin: dict = Depends(get_admin_user)):
+    """
+    Manually re-chunk a specific chapter.
+    Useful for fixing chunking issues or after manual content edits.
+    """
+    try:
+        result = await rechunk_chapter(chapter_id)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Re-chunking failed for chapter {chapter_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Re-chunking failed: {str(e)}")
+
+
+@api.post("/admin/content/bulk-rechunk")
+async def admin_bulk_rechunk_all_chapters(
+    subject_id: Optional[str] = None,
+    admin: dict = Depends(get_admin_user)
+):
+    """
+    Bulk re-chunk all chapters (or chapters in a specific subject).
+    
+    Use cases:
+    - Initial setup: chunk all existing chapters that have content
+    - After algorithm improvements
+    - Database migration
+    
+    Query params:
+    - subject_id (optional): Only rechunk chapters from this subject
+    """
+    # Find chapters with content
+    filter_query = {"content": {"$exists": True, "$ne": ""}}
+    if subject_id:
+        filter_query["subject_id"] = subject_id
+    
+    chapters = await db.chapters.find(filter_query, {"_id": 0, "id": 1, "title": 1, "subject_id": 1}).to_list(1000)
+    
+    if not chapters:
+        return {
+            "message": "No chapters with content found",
+            "total": 0,
+            "chunked": 0,
+            "failed": 0
+        }
+    
+    total = len(chapters)
+    chunked = 0
+    failed = 0
+    failed_chapters = []
+    
+    for chapter in chapters:
+        try:
+            result = await rechunk_chapter(chapter["id"])
+            if result["chunks_created"] > 0:
+                chunked += 1
+                logger.info(f"✅ Bulk rechunked: {chapter['title']} → {result['chunks_created']} chunks")
+        except Exception as e:
+            failed += 1
+            failed_chapters.append({
+                "chapter_id": chapter["id"],
+                "title": chapter.get("title"),
+                "error": str(e)
+            })
+            logger.error(f"❌ Bulk rechunk failed for {chapter.get('title')}: {e}")
+    
+    return {
+        "message": f"Bulk re-chunking complete",
+        "total_chapters": total,
+        "successfully_chunked": chunked,
+        "failed": failed,
+        "failed_chapters": failed_chapters if failed > 0 else []
+    }
+
+
+@api.get("/admin/content/chunks/stats")
+async def get_chunking_stats(admin: dict = Depends(get_admin_user)):
+    """
+    Get statistics about content chunking across the platform.
+    Useful for monitoring RAG quality.
+    """
+    # Total chunks
+    total_chunks = await db.chunks.count_documents({})
+    
+    # Chunks by subject
+    pipeline = [
+        {"$group": {
+            "_id": "$subject_id",
+            "count": {"$sum": 1},
+            "avg_size": {"$avg": "$char_count"}
+        }},
+        {"$sort": {"count": -1}},
+        {"$limit": 10}
+    ]
+    chunks_by_subject = await db.chunks.aggregate(pipeline).to_list(10)
+    
+    # Get subject names
+    if chunks_by_subject:
+        subject_ids = [item["_id"] for item in chunks_by_subject if item["_id"]]
+        subjects = await db.subjects.find(
+            {"id": {"$in": subject_ids}},
+            {"_id": 0, "id": 1, "name": 1}
+        ).to_list(20)
+        subject_map = {s["id"]: s["name"] for s in subjects}
+        
+        for item in chunks_by_subject:
+            item["subject_name"] = subject_map.get(item["_id"], "Unknown")
+    
+    # Chapters with/without chunks
+    total_chapters = await db.chapters.count_documents({})
+    chapters_with_content = await db.chapters.count_documents({"content": {"$exists": True, "$ne": ""}})
+    
+    # Chapters that have chunks
+    chunked_chapter_ids = await db.chunks.distinct("chapter_id")
+    chapters_with_chunks = len(chunked_chapter_ids)
+    chapters_without_chunks = chapters_with_content - chapters_with_chunks
+    
+    return {
+        "total_chunks": total_chunks,
+        "total_chapters": total_chapters,
+        "chapters_with_content": chapters_with_content,
+        "chapters_with_chunks": chapters_with_chunks,
+        "chapters_without_chunks": chapters_without_chunks,
+        "coverage_percent": round((chapters_with_chunks / chapters_with_content * 100) if chapters_with_content > 0 else 0, 1),
+        "top_subjects_by_chunks": chunks_by_subject,
+        "recommendation": "Run /admin/content/bulk-rechunk to chunk all chapters" if chapters_without_chunks > 0 else "All content is chunked ✅"
+    }
+
+
 
 @api.patch("/admin/content/uploads/{content_id}")
 async def update_content_upload(content_id: str, data: dict, admin: dict = Depends(get_admin_user)):

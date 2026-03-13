@@ -3,7 +3,7 @@ Syrabit.ai Backend - FastAPI + MongoDB
 AHSEC AI-Powered Educational Platform
 """
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, BackgroundTasks, File, UploadFile, Form, Response, Cookie
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, BackgroundTasks, File, UploadFile, Form, Response, Cookie, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse, FileResponse
@@ -222,6 +222,10 @@ async def lifespan(app):
         await db.streams.create_index("class_id")
         await db.classes.create_index("board_id")
         await db.chunks.create_index("chapter_id")
+        # Analytics indexes
+        await db.analytics.create_index([("event_type", 1), ("timestamp", -1)])
+        await db.analytics.create_index([("subject_id", 1), ("event_type", 1)])
+        await db.analytics.create_index("user_id")
     except Exception as e:
         logger.warning(f"Seeding/indexing skipped (MongoDB may not be ready): {e}")
     _rate_cleanup_task = asyncio.create_task(_rate_limiter_cleanup())
@@ -492,6 +496,24 @@ async def get_current_user(
     if user.get("status") == "suspended":
         raise HTTPException(status_code=403, detail="Account suspended")
     return user
+
+async def get_current_user_optional(
+    creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    syrabit_session: Optional[str] = Cookie(default=None),
+):
+    """Get current user if authenticated, otherwise return None"""
+    token = creds.credentials if creds else syrabit_session
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        user = await supa_get_user_by_id(user_id)
+        return user if user and user.get("status") not in ["banned", "suspended"] else None
+    except:
+        return None
 
 async def get_admin_user(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(security),
@@ -1068,6 +1090,135 @@ def _extract_keywords(query: str) -> list:
     }
     raw = [w.strip('?.,!;:()[]"\'').lower() for w in query.split()]
     return [w for w in raw if len(w) >= 3 and w not in stop_words][:6]
+
+
+# ─────────────────────────────────────────────
+# LIBRARY ANALYTICS TRACKING
+# ─────────────────────────────────────────────
+
+async def track_library_event(
+    event_type: str,
+    subject_id: str = None,
+    chapter_id: str = None,
+    user_id: str = None,
+    search_query: str = None,
+    metadata: dict = None
+):
+    """
+    Track library user interactions for analytics.
+    
+    Event types:
+    - 'search': User searched in library
+    - 'subject_view': User opened a subject
+    - 'chapter_view': User viewed a chapter
+    - 'ask_ai_click': User clicked Ask AI button
+    - 'document_open': User opened document viewer
+    """
+    try:
+        event = {
+            "id": str(uuid.uuid4()),
+            "event_type": event_type,
+            "subject_id": subject_id,
+            "chapter_id": chapter_id,
+            "user_id": user_id,
+            "search_query": search_query,
+            "metadata": metadata or {},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.analytics.insert_one(event)
+        logger.debug(f"📊 Analytics tracked: {event_type} | subject: {subject_id}")
+    except Exception as e:
+        logger.error(f"Analytics tracking failed: {e}")
+
+
+async def get_library_analytics(days: int = 30):
+    """Get library analytics summary"""
+    start_date = datetime.now(timezone.utc) - timedelta(days=days)
+    start_iso = start_date.isoformat()
+    
+    # Most searched queries
+    search_pipeline = [
+        {"$match": {"event_type": "search", "timestamp": {"$gte": start_iso}}},
+        {"$group": {"_id": "$search_query", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 10}
+    ]
+    top_searches = await db.analytics.aggregate(search_pipeline).to_list(10)
+    
+    # Most viewed subjects
+    subject_view_pipeline = [
+        {"$match": {"event_type": "subject_view", "timestamp": {"$gte": start_iso}, "subject_id": {"$ne": None}}},
+        {"$group": {"_id": "$subject_id", "view_count": {"$sum": 1}}},
+        {"$sort": {"view_count": -1}},
+        {"$limit": 10}
+    ]
+    top_subjects_raw = await db.analytics.aggregate(subject_view_pipeline).to_list(10)
+    
+    # Get subject details
+    if top_subjects_raw:
+        subject_ids = [item["_id"] for item in top_subjects_raw]
+        subjects = await db.subjects.find({"id": {"$in": subject_ids}}, {"_id": 0, "id": 1, "name": 1, "description": 1}).to_list(20)
+        subject_map = {s["id"]: s for s in subjects}
+        
+        top_subjects = []
+        for item in top_subjects_raw:
+            subj = subject_map.get(item["_id"])
+            if subj:
+                top_subjects.append({
+                    "subject_id": item["_id"],
+                    "name": subj["name"],
+                    "view_count": item["view_count"]
+                })
+    else:
+        top_subjects = []
+    
+    # Most "Ask AI" clicks
+    ask_ai_pipeline = [
+        {"$match": {"event_type": "ask_ai_click", "timestamp": {"$gte": start_iso}, "subject_id": {"$ne": None}}},
+        {"$group": {"_id": "$subject_id", "ask_count": {"$sum": 1}}},
+        {"$sort": {"ask_count": -1}},
+        {"$limit": 10}
+    ]
+    top_ask_ai_raw = await db.analytics.aggregate(ask_ai_pipeline).to_list(10)
+    
+    if top_ask_ai_raw:
+        ask_subject_ids = [item["_id"] for item in top_ask_ai_raw]
+        ask_subjects = await db.subjects.find({"id": {"$in": ask_subject_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(20)
+        ask_subject_map = {s["id"]: s["name"] for s in ask_subjects}
+        
+        top_ask_ai = []
+        for item in top_ask_ai_raw:
+            name = ask_subject_map.get(item["_id"], "Unknown")
+            top_ask_ai.append({
+                "subject_id": item["_id"],
+                "name": name,
+                "ask_count": item["ask_count"]
+            })
+    else:
+        top_ask_ai = []
+    
+    # Document opens
+    doc_open_count = await db.analytics.count_documents({
+        "event_type": "document_open",
+        "timestamp": {"$gte": start_iso}
+    })
+    
+    # Total events by type
+    event_type_pipeline = [
+        {"$match": {"timestamp": {"$gte": start_iso}}},
+        {"$group": {"_id": "$event_type", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}}
+    ]
+    events_by_type = await db.analytics.aggregate(event_type_pipeline).to_list(20)
+    
+    return {
+        "period_days": days,
+        "top_searches": [{"query": item["_id"], "count": item["count"]} for item in top_searches if item["_id"]],
+        "most_viewed_subjects": top_subjects,
+        "most_ask_ai_subjects": top_ask_ai,
+        "document_opens": doc_open_count,
+        "events_by_type": {item["_id"]: item["count"] for item in events_by_type},
+    }
 
 
 # ─────────────────────────────────────────────
@@ -3179,24 +3330,73 @@ async def admin_get_conversations(admin: dict = Depends(get_admin_user)):
     return convs
 
 @api.get("/admin/analytics")
-async def admin_analytics(admin: dict = Depends(get_admin_user)):
+async def admin_analytics(days: int = 30, admin: dict = Depends(get_admin_user)):
+    """
+    Enhanced admin analytics dashboard with library interaction tracking
+    
+    Query params:
+    - days: Number of days to look back (default: 30)
+    """
     await ensure_seeded()
     users = await supa_list_users()
+    
+    # Daily signups
     daily_signups = []
     for i in range(7):
         day = (datetime.now(timezone.utc) - timedelta(days=6-i)).strftime("%Y-%m-%d")
-        next_day = (datetime.now(timezone.utc) - timedelta(days=5-i)).strftime("%Y-%m-%d")
         count = sum(1 for u in users if u.get("created_at", "")[:10] == day)
         daily_signups.append({"date": day, "count": count})
+    
+    # Plan usage
     plan_usage = {}
     for u in users:
         p = u.get("plan", "free")
         plan_usage[p] = plan_usage.get(p, 0) + u.get("credits_used", 0)
+    
+    # Library analytics
+    library_stats = await get_library_analytics(days=days)
+    
     return {
         "daily_signups": daily_signups,
         "plan_usage": plan_usage,
-        "top_subjects": [],
+        "library": library_stats,
+        "total_users": len(users),
+        "active_users": sum(1 for u in users if u.get("credits_used", 0) > 0),
     }
+
+
+@api.post("/analytics/track")
+async def track_event(
+    event_type: str = Body(...),
+    subject_id: str = Body(None),
+    chapter_id: str = Body(None),
+    search_query: str = Body(None),
+    metadata: dict = Body(None),
+    user: dict = Depends(get_current_user_optional)
+):
+    """
+    Public endpoint for tracking library interactions.
+    Called from frontend when user interacts with content.
+    
+    Event types:
+    - search: User searched in library
+    - subject_view: User opened a subject
+    - chapter_view: User viewed a chapter
+    - ask_ai_click: User clicked Ask AI button
+    - document_open: User opened document viewer
+    """
+    user_id = user.get("id") if user else None
+    
+    await track_library_event(
+        event_type=event_type,
+        subject_id=subject_id,
+        chapter_id=chapter_id,
+        user_id=user_id,
+        search_query=search_query,
+        metadata=metadata
+    )
+    
+    return {"status": "tracked"}
 
 # ─────────────────────────────────────────────
 # ADMIN CONTENT MANAGEMENT — Boards / Classes / Streams

@@ -31,6 +31,8 @@ class LlmChat:
 
         if self._provider == "openai":
             return await self._call_openai(messages)
+        elif self._provider == "fireworksai":
+            return await self._call_fireworks(messages)
         else:
             return await self._call_groq(messages)
 
@@ -46,6 +48,19 @@ class LlmChat:
     async def _call_openai(self, messages: list) -> str:
         import openai
         client = openai.AsyncOpenAI(api_key=self.api_key)
+        response = await client.chat.completions.create(
+            model=self._model,
+            messages=messages,
+        )
+        return response.choices[0].message.content or ""
+
+    async def _call_fireworks(self, messages: list) -> str:
+        """Call Fireworks AI using OpenAI-compatible client"""
+        import openai
+        client = openai.AsyncOpenAI(
+            api_key=self.api_key,
+            base_url="https://api.fireworks.ai/inference/v1"
+        )
         response = await client.chat.completions.create(
             model=self._model,
             messages=messages,

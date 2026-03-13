@@ -58,7 +58,7 @@ _EXPLICIT_PROVIDER = os.environ.get('LLM_PROVIDER', '').strip().lower()
 if _EXPLICIT_PROVIDER == 'fireworksai' and _FIREWORKS_KEY:
     LLM_PROVIDER = 'fireworksai'
     LLM_API_KEY = _FIREWORKS_KEY
-    LLM_MODEL = os.environ.get('LLM_MODEL', 'qwen/qwen3-32b')
+    LLM_MODEL = os.environ.get('LLM_MODEL', 'accounts/fireworks/models/qwen2p5-72b-instruct')
 elif _EXPLICIT_PROVIDER == 'openai' and _OPENAI_KEY and _OPENAI_KEY != 'x':
     LLM_PROVIDER = 'openai'
     LLM_API_KEY = _OPENAI_KEY
@@ -70,7 +70,7 @@ elif _EXPLICIT_PROVIDER == 'groq' and _GROQ_KEY and _GROQ_KEY != 'x':
 elif _FIREWORKS_KEY:
     LLM_PROVIDER = 'fireworksai'
     LLM_API_KEY = _FIREWORKS_KEY
-    LLM_MODEL = os.environ.get('LLM_MODEL', 'qwen/qwen3-32b')
+    LLM_MODEL = os.environ.get('LLM_MODEL', 'accounts/fireworks/models/qwen2p5-72b-instruct')
 elif _GROQ_KEY and _GROQ_KEY != 'x':
     LLM_PROVIDER = 'groq'
     LLM_API_KEY = _GROQ_KEY
@@ -1671,14 +1671,15 @@ _llm_batcher = _LlmBatcher()
 
 _LLM_PROVIDERS = []
 if _FIREWORKS_KEY:
-    _LLM_PROVIDERS.append({"provider": "fireworksai", "key": _FIREWORKS_KEY, "default_model": "qwen/qwen3-32b"})
+    _LLM_PROVIDERS.append({"provider": "fireworksai", "key": _FIREWORKS_KEY, "default_model": "accounts/fireworks/models/qwen2p5-72b-instruct"})
 if _GROQ_KEY and _GROQ_KEY != 'x':
     _LLM_PROVIDERS.append({"provider": "groq", "key": _GROQ_KEY, "default_model": "llama-3.1-8b-instant"})
 if _OPENAI_KEY and _OPENAI_KEY != 'x':
     _LLM_PROVIDERS.append({"provider": "openai", "key": _OPENAI_KEY, "default_model": "gpt-4o-mini"})
 
 _MODEL_PROVIDER_MAP = {
-    "qwen/qwen3-32b": "fireworksai",
+    "accounts/fireworks/models/qwen2p5-72b-instruct": "fireworksai",
+    "accounts/fireworks/models/qwen3-235b-a22b": "fireworksai",
     "llama-3.3-70b-versatile": "groq",
     "llama-3.1-8b-instant": "groq",
 }

@@ -536,12 +536,8 @@ export default function LibraryPage() {
                 className="text-foreground shimmer-text"
                 style={{ fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.2 }}
               >
-                AHSEC Study Library — Class 11, 12 &amp; Degree
+                AHSEC &amp; DEGREE STUDY LIBRARY
               </h1>
-              <p className="text-muted-foreground text-sm mt-1 flex items-center gap-1.5">
-                <Sparkles size={14} aria-hidden="true" style={{ color: 'hsl(var(--primary) / 0.6)' }} />
-                AHSEC Exam Prep Assistant
-              </p>
             </div>
 
             {/* Update Library Button */}

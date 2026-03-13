@@ -82,3 +82,6 @@ Syrabitai/.git/lfs/objects/48/74/48747572eb4a79fdc2ff6fe7add9ce4a4382a3935bc26d5
 Syrabitai/data/db/journal/WiredTigerPreplog.0000000001
 Syrabitai/data/db/journal/WiredTigerPreplog.0000000002
 Syrabitai/data/db/journal/WiredTigerLog.0000000126
+frontend/node_modules/.cache/default-development/0.pack
+frontend/node_modules/.cache/default-development/1.pack
+Syrabitai/.git/lfs/objects/ac/f5/acf50e12957d7530a533a2d625180dc6d85614ebd1b3e35c0290d03ba762481d

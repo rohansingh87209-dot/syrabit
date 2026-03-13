@@ -1,33 +1,388 @@
 <!doctype html>
-<html lang="en">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#000000" />
-        <meta name="description" content="A product of emergent.sh" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
-        <!--
-        manifest.json provides metadata used when your web app is installed on a
-        user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-        -->
-        <!--
-        Notice the use of %PUBLIC_URL% in the tags above.
-        It will be replaced with the URL of the `public` folder during the build.
-        Only files inside the `public` folder can be referenced from the HTML.
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
-        Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-        work correctly both with client-side routing and a non-root public URL.
-        Learn how to configure a non-root public URL by running `npm run build`.
-        -->
-        <title>Emergent | Fullstack App</title>
-        <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
-        <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
-    </head>
-    <body>
-        <noscript>You need to enable JavaScript to run this app.</noscript>
-        <div id="root"></div>
+    <!-- ── PWA & Theme ── -->
+    <meta name="theme-color" content="#7c3aed" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#7c3aed" media="(prefers-color-scheme: light)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Syrabit.ai" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-72x72.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png" />
+
+    <!-- ── SEO ── -->
+    <title>Syrabit.ai — AI-Powered AHSEC &amp; Degree Exam Preparation</title>
+    <meta name="description" content="Master AHSEC (Class 11-12) and Degree (B.Com, B.A, B.Sc) exams with Syrabit.ai's AI tutor. Instant answers, syllabus-aligned content, 500+ students." />
+    <meta name="keywords" content="AHSEC exam prep, Class 11 12 AI tutor, Assam board, AHSEC AI, degree exam prep, B.Com B.A B.Sc" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://syrabit.ai/" />
+    <link rel="sitemap" type="application/xml" href="/sitemap.xml" />
+
+    <!-- ── Open Graph ── -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Syrabit.ai" />
+    <meta property="og:title" content="Syrabit.ai — AI-Powered AHSEC Exam Prep" />
+    <meta property="og:description" content="24/7 AI tutor for AHSEC Class 11-12 & Degree students. Instant syllabus-aligned answers. Start free." />
+    <meta property="og:url" content="https://syrabit.ai/" />
+    <meta property="og:image" content="https://syrabit.ai/icons/icon-512x512.png" />
+    <meta property="og:locale" content="en_IN" />
+
+    <!-- ── Twitter / X Card ── -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Syrabit.ai — AI-Powered AHSEC Exam Prep" />
+    <meta name="twitter:description" content="Ace your AHSEC &amp; Degree exams with AI. Syllabus-aligned, instant answers." />
+    <meta name="twitter:image" content="https://syrabit.ai/icons/icon-512x512.png" />
+
+    <!-- Fonts loaded via CSS (display=swap prevents render blocking) -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+
+    <!-- ── Security Meta Headers ── -->
+    <!-- Security: handled by backend HTTP headers, not meta tags -->
+
+    <!-- ── JSON-LD Structured Data ── -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Syrabit.ai",
+      "url": "https://syrabit.ai",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Any",
+      "description": "AI-powered exam preparation platform for AHSEC Class 11-12 and Degree students in Assam, India.",
+      "offers": [
+        { "@type": "Offer", "name": "Free Plan", "price": "0", "priceCurrency": "INR" },
+        { "@type": "Offer", "name": "Starter Plan", "price": "99", "priceCurrency": "INR" },
+        { "@type": "Offer", "name": "Pro Plan", "price": "999", "priceCurrency": "INR" }
+      ],
+      "provider": {
+        "@type": "Organization",
+        "name": "Syrabit.ai",
+        "url": "https://syrabit.ai",
+        "sameAs": ["https://syrabit.ai"]
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "reviewCount": "127"
+      }
+    }
+    </script>
+
+    <!-- Emergent scripts (do not remove) -->
+    <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
+    <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
+
+    <!-- Emergent badge — ULTRA MINIMIZED: transparent, invisible, non-clickable -->
+    <style>
+      /* NUCLEAR CSS — Maximum hiding with all possible properties */
+      #emergent-badge,
+      a[href*="emergent.sh"],
+      a[href*="emergent-badge"],
+      a[href*="emergent"],
+      [id*="emergent-badge"],
+      [id*="emergent"],
+      [class*="emergent-badge"],
+      [class*="emergent"] {
+        /* Size: absolute minimum */
+        width: 0 !important;
+        height: 0 !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        max-width: 0 !important;
+        max-height: 0 !important;
+        
+        /* Visibility: completely hidden */
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        
+        /* Positioning: off-screen */
+        position: fixed !important;
+        top: -9999px !important;
+        left: -9999px !important;
+        bottom: auto !important;
+        right: auto !important;
+        z-index: -99999 !important;
+        
+        /* Spacing: zero */
+        padding: 0 !important;
+        margin: 0 !important;
+        
+        /* Appearance: transparent */
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        border: 0 !important;
+        outline: 0 !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+        
+        /* Text: invisible */
+        color: transparent !important;
+        font-size: 0 !important;
+        line-height: 0 !important;
+        
+        /* Interaction: disabled */
+        pointer-events: none !important;
+        user-select: none !important;
+        cursor: default !important;
+        
+        /* Clipping: hidden */
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        clip-path: inset(50%) !important;
+        
+        /* Transform: invisible */
+        transform: scale(0) translateX(-9999px) translateY(-9999px) !important;
+        transform-origin: 0 0 !important;
+        
+        /* Content: removed */
+        content: '' !important;
+        content-visibility: hidden !important;
+        
+        /* Filter: invisible */
+        filter: opacity(0) !important;
+        backdrop-filter: none !important;
+      }
+      
+      /* Hide all children and pseudo-elements */
+      #emergent-badge *,
+      #emergent-badge::before,
+      #emergent-badge::after,
+      a[href*="emergent.sh"] *,
+      a[href*="emergent.sh"]::before,
+      a[href*="emergent.sh"]::after,
+      [id*="emergent"] *,
+      [id*="emergent"]::before,
+      [id*="emergent"]::after,
+      [class*="emergent"] *,
+      [class*="emergent"]::before,
+      [class*="emergent"]::after {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        font-size: 0 !important;
+        color: transparent !important;
+        pointer-events: none !important;
+        user-select: none !important;
+        position: absolute !important;
+        top: -9999px !important;
+        left: -9999px !important;
+      }
+    </style>
+    <script>
+    (function() {
+      'use strict';
+      
+      // Ultimate badge obliteration script
+      var NUCLEAR_HIDE = [
+        'display:none!important',
+        'visibility:hidden!important',
+        'opacity:0!important',
+        'width:0!important',
+        'height:0!important',
+        'max-width:0!important',
+        'max-height:0!important',
+        'min-width:0!important',
+        'min-height:0!important',
+        'overflow:hidden!important',
+        'clip:rect(0,0,0,0)!important',
+        'clip-path:inset(50%)!important',
+        'transform:scale(0)translateX(-9999px)translateY(-9999px)!important',
+        'border:0!important',
+        'padding:0!important',
+        'margin:0!important',
+        'background:transparent!important',
+        'box-shadow:none!important',
+        'position:fixed!important',
+        'top:-9999px!important',
+        'left:-9999px!important',
+        'z-index:-99999!important',
+        'pointer-events:none!important',
+        'user-select:none!important',
+        'cursor:default!important',
+        'color:transparent!important',
+        'font-size:0!important',
+        'line-height:0!important',
+        'filter:opacity(0)!important'
+      ].join(';');
+
+      function obliterateBadge() {
+        // All possible selectors
+        var selectors = [
+          '#emergent-badge',
+          'a[href*="emergent.sh"]',
+          'a[href*="emergent-badge"]',
+          'a[href*="emergent"]',
+          '[id*="emergent-badge"]',
+          '[id*="emergent"]',
+          '[class*="emergent-badge"]',
+          '[class*="emergent"]'
+        ];
+        
+        selectors.forEach(function(selector) {
+          try {
+            document.querySelectorAll(selector).forEach(function(el) {
+              // Apply nuclear styles
+              el.style.cssText = NUCLEAR_HIDE;
+              
+              // Remove from DOM entirely
+              if (el.parentNode) {
+                el.parentNode.removeChild(el);
+              }
+              
+              // Also nuke all children before removal
+              el.querySelectorAll('*').forEach(function(child) {
+                child.style.cssText = NUCLEAR_HIDE;
+                if (child.parentNode) {
+                  child.parentNode.removeChild(child);
+                }
+              });
+            });
+          } catch(e) {
+            // Silently ignore errors
+          }
+        });
+      }
+
+      // Intercept element creation
+      var _origCreate = document.createElement.bind(document);
+      document.createElement = function(tag) {
+        var el = _origCreate(tag);
+        if (tag && tag.toLowerCase() === 'a') {
+          var _origSetAttr = el.setAttribute.bind(el);
+          el.setAttribute = function(name, value) {
+            _origSetAttr(name, value);
+            if ((name === 'id' && String(value).includes('emergent')) ||
+                (name === 'href' && String(value).includes('emergent')) ||
+                (name === 'class' && String(value).includes('emergent'))) {
+              el.style.cssText = NUCLEAR_HIDE;
+              // Prevent click events
+              el.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                return false;
+              }, true);
+              // Remove immediately
+              setTimeout(function() {
+                if (el.parentNode) el.parentNode.removeChild(el);
+              }, 0);
+            }
+          };
+        }
+        return el;
+      };
+
+      // MutationObserver with aggressive removal
+      var mo = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          if (mutation.addedNodes.length) {
+            obliterateBadge();
+          }
+        });
+      });
+
+      // Initialize
+      function init() {
+        obliterateBadge();
+        
+        if (document.documentElement) {
+          mo.observe(document.documentElement, { 
+            childList: true, 
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['id', 'class', 'href']
+          });
+        }
+      }
+
+      // Run immediately
+      obliterateBadge();
+      
+      // Run on DOMContentLoaded
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+
+      // Run on load
+      window.addEventListener('load', function() {
+        obliterateBadge();
+        // Ultra-aggressive intervals
+        [100, 200, 300, 500, 800, 1000, 1500, 2000, 3000, 5000, 8000].forEach(function(delay) {
+          setTimeout(obliterateBadge, delay);
+        });
+      });
+
+      // Continuous monitoring (aggressive for first 10 seconds)
+      var counter = 0;
+      var aggressiveInterval = setInterval(function() {
+        obliterateBadge();
+        counter++;
+        if (counter > 100) { // After 10 seconds (100ms × 100)
+          clearInterval(aggressiveInterval);
+          // Then check every 2 seconds indefinitely
+          setInterval(obliterateBadge, 2000);
+        }
+      }, 100);
+
+      // Intercept all click events on emergent elements
+      document.addEventListener('click', function(e) {
+        var target = e.target;
+        var href = target.getAttribute && target.getAttribute('href');
+        var id = target.getAttribute && target.getAttribute('id');
+        var className = target.getAttribute && target.getAttribute('class');
+        
+        if ((href && href.includes('emergent')) ||
+            (id && id.includes('emergent')) ||
+            (className && className.includes('emergent'))) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          obliterateBadge();
+          return false;
+        }
+      }, true);
+
+    })();
+    </script>
+  </head>
+  <body>
+    <!-- Skip link for keyboard users (WCAG 2.1) -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-primary focus:text-white focus:rounded-xl focus:font-semibold">
+      Skip to main content
+    </a>
+
+
+    <script>
+      (function(){
+        var CURRENT='syrabit-v3.0-clean';
+        if('caches' in window){
+          caches.keys().then(function(names){
+            names.forEach(function(name){
+              if(name!==CURRENT) caches.delete(name);
+            });
+          });
+        }
+        if('serviceWorker' in navigator){
+          navigator.serviceWorker.getRegistrations().then(function(regs){
+            regs.forEach(function(r){ r.update(); });
+          });
+        }
+      })();
+    </script>
+    <noscript>You need to enable JavaScript to run Syrabit.ai. Please enable JavaScript in your browser settings.</noscript>
+    <div id="root"></div>
         <!--
       This HTML file is a template.
       If you open it directly in the browser, you will see an empty page.
@@ -38,51 +393,6 @@
       To begin the development, run `npm start` or `yarn start`.
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
-        <a
-            id="emergent-badge"
-            target="_blank"
-            href="https://app.emergent.sh/?utm_source=emergent-badge"
-            style="
-                display: inline-flex !important;
-                box-sizing: border-box;
-                width: 178px;
-                height: 40px;
-                padding: 8px 12px 8px 12px;
-                align-items: center !important;
-                gap: 8px;
-                border-radius: 50px !important;
-                background: #000 !important;
-                position: fixed !important;
-                bottom: 16px;
-                right: 16px;
-                text-decoration: none;
-                font-family: -apple-system, BlinkMacSystemFont,
-                    &quot;Segoe UI&quot;, Roboto, Oxygen, Ubuntu, Cantarell,
-                    &quot;Open Sans&quot;, &quot;Helvetica Neue&quot;,
-                    sans-serif !important;
-                font-size: 12px !important;
-                z-index: 9999 !important;
-            "
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M15.5702 8.13142C15.7729 8.0412 16.0007 8.18878 15.9892 8.4103C15.8374 11.3192 14.0965 14.0405 11.2531 15.3065C8.40964 16.5725 5.2224 16.0453 2.95912 14.2117C2.78676 14.072 2.82955 13.804 3.03219 13.7137L4.95677 12.8568C5.04866 12.8159 5.15446 12.823 5.24204 12.8725C6.73377 13.7153 8.59176 13.8649 10.2772 13.1145C11.9626 12.3641 13.0947 10.8833 13.4665 9.21075C13.4883 9.11256 13.5539 9.02918 13.6457 8.98827L15.5702 8.13142Z" fill="white"/>
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M15.3066 4.74698L15.5067 5.19653C15.5759 5.35178 15.5061 5.53366 15.3508 5.60278L1.29992 11.8586C1.14467 11.9278 0.962794 11.8579 0.893675 11.7027L0.701732 11.2716L0.693457 11.2531C-1.10317 7.21778 0.711626 2.49007 4.74692 0.693443C8.78221 -1.10318 13.51 0.711693 15.3066 4.74698ZM2.82356 8.55367C2.63552 8.63739 2.41991 8.51617 2.40853 8.31065C2.28373 6.05724 3.53858 3.85787 5.72286 2.88536C7.90715 1.91286 10.3813 2.45199 11.9724 4.05256C12.1175 4.19854 12.0633 4.43988 11.8753 4.5236L2.82356 8.55367Z" fill="white"/>
-            </svg>
-            <p
-                style="
-                    color: #FFF !important;
-                    font-family: 'Inter', sans-serif !important;
-                    font-size: 13px !important;
-                    font-style: normal !important;
-                    font-weight: 600 !important;
-                    line-height: 20px !important;
-                    margin: 0 !important;
-                    white-space: nowrap !important;
-                "
-            >
-                Made with Emergent
-            </p>
-        </a>
         <script>
             !(function (t, e) {
                 var o, n, p, r;

@@ -405,42 +405,6 @@ export default function LibraryPage() {
   // PDF Cache - stores fetched PDFs to avoid re-fetching
   const [pdfCache] = useState(() => new Map());
 
-  // Preload PDFs for subjects with documents (in background after initial load)
-  useEffect(() => {
-    if (!subjects.length) return;
-    
-    // Prefetch PDFs for subjects with documents (limit to first 3 to avoid overwhelming)
-    const subjectsWithDocs = subjects.filter(s => s.has_document).slice(0, 3);
-    
-    const prefetchPdfs = async () => {
-      const API = process.env.REACT_APP_BACKEND_URL || '';
-      
-      for (const subject of subjectsWithDocs) {
-        // Skip if already cached
-        if (pdfCache.has(subject.id)) continue;
-        
-        try {
-          const response = await fetch(`${API}/api/content/subject-documents/${subject.id}?include_pdf=true`);
-          const docs = await response.json();
-          
-          if (docs && docs.length > 0 && docs[0].pdf_data_url) {
-            pdfCache.set(subject.id, docs[0]);
-          }
-        } catch (error) {
-          // Silent fail for prefetch
-          console.log(`Prefetch failed for ${subject.id}:`, error);
-        }
-        
-        // Small delay between prefetches to avoid overwhelming
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    };
-    
-    // Prefetch after 2 seconds to not block initial page load
-    const timeoutId = setTimeout(prefetchPdfs, 2000);
-    return () => clearTimeout(timeoutId);
-  }, [subjects, pdfCache]);
-
   // ── React Query data ──────────────────────────────────────────────────────
   const { data: subjects = [],  isLoading: subjectsLoading, refetch: refetchSubjects } = useSubjects();
   const { data: boards   = [] }                               = useBoards();
@@ -473,6 +437,45 @@ export default function LibraryPage() {
     window.addEventListener('content-uploaded', handleContentUploaded);
     return () => window.removeEventListener('content-uploaded', handleContentUploaded);
   }, [refetchSubjects]);
+
+  // ── Preload PDFs for subjects with documents (background prefetch) ───────────
+  useEffect(() => {
+    if (!subjects || subjects.length === 0) return;
+    
+    // Prefetch PDFs for subjects with documents (limit to first 3 to avoid overwhelming)
+    const subjectsWithDocs = subjects.filter(s => s.has_document).slice(0, 3);
+    
+    if (subjectsWithDocs.length === 0) return;
+    
+    const prefetchPdfs = async () => {
+      const API = process.env.REACT_APP_BACKEND_URL || '';
+      
+      for (const subject of subjectsWithDocs) {
+        // Skip if already cached
+        if (pdfCache.has(subject.id)) continue;
+        
+        try {
+          const response = await fetch(`${API}/api/content/subject-documents/${subject.id}?include_pdf=true`);
+          const docs = await response.json();
+          
+          if (docs && docs.length > 0 && docs[0].pdf_data_url) {
+            pdfCache.set(subject.id, docs[0]);
+            console.log(`✅ Prefetched PDF for ${subject.name}`);
+          }
+        } catch (error) {
+          // Silent fail for prefetch
+          console.log(`Prefetch skipped for ${subject.name}`);
+        }
+        
+        // Small delay between prefetches to avoid overwhelming
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    };
+    
+    // Prefetch after 2 seconds to not block initial page load
+    const timeoutId = setTimeout(prefetchPdfs, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [subjects, pdfCache]);
 
   // ── Data enrichment pipeline ──────────────────────────────────────────────
   const enrichedSubjects = subjects.map((sub) => {

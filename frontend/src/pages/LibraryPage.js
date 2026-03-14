@@ -17,6 +17,7 @@ import {
 } from '@/hooks/useContent';
 import { useToggleSavedSubject } from '@/hooks/useUser';
 import DocumentViewerModal from '@/components/DocumentViewerModal';
+import PdfViewer from '@/components/PdfViewer';
 
 // ── Inline Globe SVG (no lucide Globe import in this file per spec) ──────────
 function Globe({ className }) {
@@ -119,7 +120,7 @@ function LibrarySkeleton() {
 }
 
 // ── Subject Card ──────────────────────────────────────────────────────────────
-function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, index }) {
+function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, onViewPdf, index }) {
   const thumbColors = THUMB_GRADIENTS[sub.gradient] || THUMB_GRADIENTS.math;
   const hasThumbnail = !!sub.thumbnailUrl;
   const tags = Array.isArray(sub.tags) ? sub.tags : [];
@@ -317,13 +318,13 @@ function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, in
           </Link>
         )}
 
-        {/* Action buttons - 2×1 Grid (Save + Open + Ask AI) */}
-        <div className="flex gap-2 pt-1">
+        {/* Action buttons - Grid layout based on hasDocument */}
+        <div className={hasDocument ? "grid grid-cols-2 gap-2 pt-1" : "flex gap-2 pt-1"}>
           {/* Save / Unsave */}
           <button
             onClick={() => onToggleSave(sub.id)}
             aria-label={isSaved ? `Unsave ${sub.name}` : `Save ${sub.name}`}
-            className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
+            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
             style={
               isSaved
                 ? { color: 'hsl(var(--primary))', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.30)' }
@@ -334,11 +335,29 @@ function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, in
             {isSaved ? 'Saved' : 'Save'}
           </button>
 
+          {/* View PDF button - only show if document exists */}
+          {hasDocument && (
+            <button
+              onClick={() => onViewPdf && onViewPdf(sub.id)}
+              aria-label={`View PDF for ${sub.name}`}
+              className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
+              style={{ 
+                color: '#f87171', 
+                background: 'rgba(239,68,68,0.10)', 
+                border: '1px solid rgba(239,68,68,0.25)' 
+              }}
+              data-testid="subject-view-pdf-button"
+            >
+              <FileText size={14} />
+              View PDF
+            </button>
+          )}
+
           {/* Open - Goes to subject page */}
           <button
             onClick={() => onOpen(sub)}
             aria-label={`Open ${sub.name}`}
-            className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
+            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
             style={
               hasDocument
                 ? { color: '#34d399', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)' }
@@ -353,7 +372,7 @@ function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, in
           <button
             onClick={() => onAskAI(sub.id, hasDocument)}
             aria-label={`Ask AI about ${sub.name}`}
-            className="flex-1 flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 hover:shadow-lg active:scale-95"
+            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 hover:shadow-lg active:scale-95"
             style={{
               background: hasDocument
                 ? 'linear-gradient(135deg, #059669, #10b981)'
@@ -380,6 +399,8 @@ export default function LibraryPage() {
   const [searchQuery, setSearchQuery]   = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [viewingDoc, setViewingDoc]     = useState(null);
+  const [pdfToView, setPdfToView]       = useState(null);
+  const [loadingPdf, setLoadingPdf]     = useState(false);
 
   // ── React Query data ──────────────────────────────────────────────────────
   const { data: subjects = [],  isLoading: subjectsLoading, refetch: refetchSubjects } = useSubjects();
@@ -502,6 +523,30 @@ export default function LibraryPage() {
 
   const handleSeoNav  = (path) => navigate(path);
   const handleResetFilters = () => { setSearchQuery(''); setActiveFilter('all'); };
+
+  const handleViewPdf = async (subjectId) => {
+    setLoadingPdf(true);
+    try {
+      const API = process.env.REACT_APP_BACKEND_URL || '';
+      // Fetch documents for this subject
+      const response = await fetch(`${API}/api/content/subject-documents/${subjectId}`);
+      const docs = await response.json();
+      
+      if (docs && docs.length > 0) {
+        // Get the first document's full details (includes pdf_data_url)
+        const docResponse = await fetch(`${API}/api/content/documents/${docs[0].id}`);
+        const docData = await docResponse.json();
+        setPdfToView(docData);
+      } else {
+        toast.error('No PDF document found for this subject');
+      }
+    } catch (error) {
+      console.error('Failed to load PDF:', error);
+      toast.error('Failed to load PDF document');
+    } finally {
+      setLoadingPdf(false);
+    }
+  };
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (subjectsLoading) {
@@ -683,6 +728,7 @@ export default function LibraryPage() {
                   onOpen={handleOpen}
                   onAskAI={handleAskAI}
                   onSeoNav={handleSeoNav}
+                  onViewPdf={handleViewPdf}
                   index={index}
                 />
               ))}
@@ -698,6 +744,25 @@ export default function LibraryPage() {
           subjectName={viewingDoc.name}
           onClose={() => setViewingDoc(null)}
         />
+      )}
+
+      {/* ── PDF Viewer ── */}
+      {pdfToView && (
+        <PdfViewer
+          pdfDataUrl={pdfToView.pdf_data_url}
+          fileName={pdfToView.file_name || pdfToView.title}
+          onClose={() => setPdfToView(null)}
+        />
+      )}
+
+      {/* Loading overlay for PDF */}
+      {loadingPdf && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <div className="text-white text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mx-auto mb-4"></div>
+            <p>Loading PDF...</p>
+          </div>
+        </div>
       )}
     </AppLayout>
   );

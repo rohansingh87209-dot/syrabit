@@ -216,7 +216,15 @@ export default function AdminContentEditor({ adminToken }) {
   useEffect(() => {
     if (selSubject) {
       axios.get(`${API}/content/chapters/${selSubject}`).then(r => setChapters(r.data || [])).catch(() => setChapters([]));
-      axios.get(`${API}/admin/content/uploads?subject_id=${selSubject}`, authHeaders(adminToken)).then(r => setUploads(r.data || [])).catch(() => setUploads([]));
+      
+      // Load documents from both sources
+      Promise.all([
+        axios.get(`${API}/admin/content/uploads?subject_id=${selSubject}`, authHeaders(adminToken)).catch(() => ({ data: [] })),
+        axios.get(`${API}/content/subject-documents/${selSubject}`, authHeaders(adminToken)).catch(() => ({ data: [] }))
+      ]).then(([oldDocs, newDocs]) => {
+        const merged = [...(oldDocs.data || []), ...(newDocs.data || [])];
+        setUploads(merged);
+      }).catch(() => setUploads([]));
     }
   }, [selSubject, adminToken]);
 
@@ -280,23 +288,58 @@ export default function AdminContentEditor({ adminToken }) {
     if (!files.length || !selSubject) return;
     setUploading(true);
     let ok = 0;
+    
     for (const file of files) {
       try {
         const fd = new FormData();
         fd.append('file', file);
         fd.append('subject_id', selSubject);
-        fd.append('content_type', contentType);
-        fd.append('title', file.name.replace(/\.[^/.]+$/, ''));
-        const ym = file.name.match(/20\d{2}/);
-        if (ym) fd.append('year', ym[0]);
-        await axios.post(`${API}/admin/content/upload`, fd, { ...authHeaders(adminToken), headers: { ...authHeaders(adminToken).headers, 'Content-Type': 'multipart/form-data' } });
+        
+        // Use new PDF endpoint for PDF files
+        if (file.name.toLowerCase().endsWith('.pdf')) {
+          fd.append('title', file.name.replace(/\.[^/.]+$/, ''));
+          await axios.post(`${API}/admin/content/upload-pdf`, fd, { 
+            ...authHeaders(adminToken), 
+            headers: { ...authHeaders(adminToken).headers, 'Content-Type': 'multipart/form-data' } 
+          });
+        } else {
+          // Use old endpoint for other files
+          fd.append('content_type', contentType);
+          fd.append('title', file.name.replace(/\.[^/.]+$/, ''));
+          const ym = file.name.match(/20\d{2}/);
+          if (ym) fd.append('year', ym[0]);
+          await axios.post(`${API}/admin/content/upload`, fd, { 
+            ...authHeaders(adminToken), 
+            headers: { ...authHeaders(adminToken).headers, 'Content-Type': 'multipart/form-data' } 
+          });
+        }
         ok++;
-      } catch {}
+      } catch (err) {
+        console.error('Upload failed:', err);
+      }
     }
+    
     setUploading(false);
     if (docRef.current) docRef.current.value = '';
-    if (ok) { toast.success(`${ok} file(s) uploaded`); axios.get(`${API}/admin/content/uploads?subject_id=${selSubject}`, authHeaders(adminToken)).then(r => setUploads(r.data || [])); }
-    else toast.error('Upload failed');
+    
+    if (ok) { 
+      toast.success(`${ok} file(s) uploaded`); 
+      // Reload documents - check both old and new collections
+      try {
+        const [oldDocs, newDocs] = await Promise.all([
+          axios.get(`${API}/admin/content/uploads?subject_id=${selSubject}`, authHeaders(adminToken)).catch(() => ({ data: [] })),
+          axios.get(`${API}/content/subject-documents/${selSubject}`, authHeaders(adminToken)).catch(() => ({ data: [] }))
+        ]);
+        
+        // Merge both document sources
+        const merged = [...(oldDocs.data || []), ...(newDocs.data || [])];
+        setUploads(merged);
+      } catch {
+        setUploads([]);
+      }
+    } else {
+      toast.error('Upload failed');
+    }
   };
 
   const handleCreateChapter = async () => {

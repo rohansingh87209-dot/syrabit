@@ -158,7 +158,13 @@ SUPABASE_URL         = os.environ.get('SUPABASE_URL', '')
 SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY', '') or os.environ.get('SUPABASE_KEY', '')
 SUPABASE_ANON_KEY    = os.environ.get('SUPABASE_ANON_KEY', '') or os.environ.get('SUPABASE_KEY', '')
 
-CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*').split(',')
+_cors_raw = os.environ.get('CORS_ORIGINS', '*').strip().strip('"').strip("'")
+if _cors_raw == '*':
+    CORS_ORIGINS = ["*"]
+    _CORS_ALLOW_CREDENTIALS = False
+else:
+    CORS_ORIGINS = [o.strip() for o in _cors_raw.split(',') if o.strip()]
+    _CORS_ALLOW_CREDENTIALS = True
 
 # ── Admin accounts ────────────────────────────────────────────────────────────
 # Admin accounts loaded from environment (no credentials in source code)
@@ -5158,10 +5164,11 @@ app.add_middleware(GlobalRateLimitMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=_CORS_ALLOW_CREDENTIALS,
     allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 

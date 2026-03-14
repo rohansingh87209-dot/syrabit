@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, X, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, X, Maximize2, Minimize2 } from 'lucide-react';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -9,10 +9,10 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
   const [numPages, setNumPages] = useState(null);
-  const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.5); // Increased default scale for better readability
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef(null);
 
   // Calculate optimal scale based on device
   const devicePixelRatio = window.devicePixelRatio || 1;
@@ -29,25 +29,8 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
     setLoading(false);
   }, []);
 
-  // Optimized page navigation
-  const changePage = useCallback((offset) => {
-    setPageNumber(prev => Math.max(1, Math.min(prev + offset, numPages || prev)));
-  }, [numPages]);
-
-  const previousPage = useCallback(() => changePage(-1), [changePage]);
-  const nextPage = useCallback(() => changePage(1), [changePage]);
-
   const zoomIn = useCallback(() => setScale(prev => Math.min(prev + 0.25, 4.0)), []);
   const zoomOut = useCallback(() => setScale(prev => Math.max(prev - 0.25, 0.75)), []);
-
-  const downloadPdf = useCallback(() => {
-    const link = document.createElement('a');
-    link.href = pdfDataUrl;
-    link.download = fileName || 'document.pdf';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }, [pdfDataUrl, fileName]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -60,17 +43,15 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
   }, []);
 
   // Keyboard shortcuts
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyPress = (e) => {
       if (e.key === 'Escape' && !document.fullscreenElement) onClose();
-      if (e.key === 'ArrowLeft') previousPage();
-      if (e.key === 'ArrowRight') nextPage();
       if (e.key === '+' || e.key === '=') zoomIn();
       if (e.key === '-') zoomOut();
     };
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [onClose, previousPage, nextPage, zoomIn, zoomOut]);
+  }, [onClose, zoomIn, zoomOut]);
 
   // Memoize document options for better performance
   const documentOptions = useMemo(() => ({
@@ -93,7 +74,7 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
             <h3 className="text-white font-semibold text-sm">{fileName || 'Document.pdf'}</h3>
             {numPages && (
               <p className="text-gray-400 text-xs">
-                Page {pageNumber} of {numPages}
+                {numPages} {numPages === 1 ? 'page' : 'pages'} • Scroll to view all
               </p>
             )}
           </div>
@@ -133,19 +114,10 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
           {/* Fullscreen Toggle */}
           <button
             onClick={toggleFullscreen}
-            className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors"
+            className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors ml-2"
             title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
           >
             {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-          </button>
-
-          {/* Download Button */}
-          <button
-            onClick={downloadPdf}
-            className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors"
-            title="Download PDF"
-          >
-            <Download size={18} />
           </button>
 
           {/* Close Button */}
@@ -159,16 +131,22 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
         </div>
       </div>
 
-      {/* PDF Content */}
-      <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-gradient-to-b from-black/95 to-black/90">
+      {/* PDF Content - Scrollable with all pages */}
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-auto flex flex-col items-center gap-4 p-8 bg-gradient-to-b from-black/95 to-black/90"
+      >
         {loading && (
-          <div className="text-white text-center">
-            <div className="relative w-12 h-12 mx-auto mb-4">
+          <div className="text-center py-20">
+            <div className="relative w-16 h-16 mx-auto mb-4">
               <div className="absolute inset-0 rounded-full border-2 border-purple-500/30"></div>
               <div className="absolute inset-0 rounded-full border-t-2 border-purple-500 animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-3 h-3 rounded-full bg-purple-500 animate-pulse"></div>
+              </div>
             </div>
-            <p className="text-sm">Loading PDF...</p>
-            {numPages && <p className="text-xs text-gray-400 mt-1">Rendering page {pageNumber} of {numPages}</p>}
+            <p className="text-sm text-white">Loading PDF...</p>
+            {numPages && <p className="text-xs text-gray-400 mt-1">Rendering {numPages} pages</p>}
           </div>
         )}
 
@@ -178,61 +156,28 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
           onLoadError={onDocumentLoadError}
           loading=""
           options={documentOptions}
-          className="shadow-2xl"
         >
-          <Page 
-            pageNumber={pageNumber} 
-            scale={renderScale}
-            renderTextLayer={true}
-            renderAnnotationLayer={true}
-            loading=""
-            className="shadow-2xl rounded-lg overflow-hidden bg-white"
-            canvasBackground="white"
-            devicePixelRatio={2}
-          />
+          {Array.from(new Array(numPages), (el, index) => (
+            <div key={`page_${index + 1}`} className="relative mb-8 last:mb-0">
+              {/* Page number indicator */}
+              <div className="absolute -top-6 left-0 text-gray-400 text-xs font-medium bg-gray-800/50 px-2 py-1 rounded">
+                Page {index + 1} of {numPages}
+              </div>
+              
+              <Page 
+                pageNumber={index + 1} 
+                scale={renderScale}
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+                loading=""
+                className="shadow-2xl rounded-lg overflow-hidden bg-white border border-white/10"
+                canvasBackground="white"
+                devicePixelRatio={2}
+              />
+            </div>
+          ))}
         </Document>
       </div>
-
-      {/* Footer Navigation */}
-      {numPages && numPages > 1 && (
-        <div className="bg-gray-900/95 border-t border-white/10 px-4 py-3 flex items-center justify-center gap-4">
-          <button
-            onClick={previousPage}
-            disabled={pageNumber <= 1}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <ChevronLeft size={18} />
-            <span>Previous</span>
-          </button>
-
-          <div className="text-white font-medium">
-            <input
-              type="number"
-              min={1}
-              max={numPages}
-              value={pageNumber}
-              onChange={(e) => {
-                const page = parseInt(e.target.value);
-                if (page >= 1 && page <= numPages) {
-                  setPageNumber(page);
-                }
-              }}
-              className="w-16 px-2 py-1 text-center bg-white/5 border border-white/10 rounded text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-            />
-            <span className="mx-2">/</span>
-            <span>{numPages}</span>
-          </div>
-
-          <button
-            onClick={nextPage}
-            disabled={pageNumber >= numPages}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <span>Next</span>
-            <ChevronRight size={18} />
-          </button>
-        </div>
-      )}
     </div>
   );
 };

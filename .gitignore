@@ -85,3 +85,7 @@ Syrabitai/data/db/journal/WiredTigerLog.0000000126
 frontend/node_modules/.cache/default-development/0.pack
 frontend/node_modules/.cache/default-development/1.pack
 Syrabitai/.git/lfs/objects/ac/f5/acf50e12957d7530a533a2d625180dc6d85614ebd1b3e35c0290d03ba762481d
+-e 
+# Environment files
+*.env
+*.env.*

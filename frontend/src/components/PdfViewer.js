@@ -10,9 +10,13 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
   const [numPages, setNumPages] = useState(null);
   const [pageNumber, setPageNumber] = useState(1);
-  const [scale, setScale] = useState(1.0);
+  const [scale, setScale] = useState(1.5); // Increased default scale for better readability
   const [loading, setLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Calculate optimal scale based on device
+  const devicePixelRatio = window.devicePixelRatio || 1;
+  const renderScale = scale * Math.min(devicePixelRatio, 2); // Cap at 2x for performance
 
   // Memoize document load callbacks
   const onDocumentLoadSuccess = useCallback(({ numPages }) => {
@@ -33,8 +37,8 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
   const previousPage = useCallback(() => changePage(-1), [changePage]);
   const nextPage = useCallback(() => changePage(1), [changePage]);
 
-  const zoomIn = useCallback(() => setScale(prev => Math.min(prev + 0.2, 3.0)), []);
-  const zoomOut = useCallback(() => setScale(prev => Math.max(prev - 0.2, 0.5)), []);
+  const zoomIn = useCallback(() => setScale(prev => Math.min(prev + 0.25, 4.0)), []);
+  const zoomOut = useCallback(() => setScale(prev => Math.max(prev - 0.25, 0.75)), []);
 
   const downloadPdf = useCallback(() => {
     const link = document.createElement('a');
@@ -99,22 +103,31 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
           {/* Zoom Controls */}
           <button
             onClick={zoomOut}
-            disabled={scale <= 0.5}
+            disabled={scale <= 0.75}
             className="p-2 rounded-lg hover:bg-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            title="Zoom Out"
+            title="Zoom Out (−)"
           >
             <ZoomOut size={18} />
           </button>
-          <span className="text-white text-sm font-medium min-w-[50px] text-center">
+          <span className="text-white text-sm font-medium min-w-[60px] text-center">
             {Math.round(scale * 100)}%
           </span>
           <button
             onClick={zoomIn}
-            disabled={scale >= 3.0}
+            disabled={scale >= 4.0}
             className="p-2 rounded-lg hover:bg-white/10 text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            title="Zoom In"
+            title="Zoom In (+)"
           >
             <ZoomIn size={18} />
+          </button>
+          
+          {/* Fit to Width Button */}
+          <button
+            onClick={() => setScale(1.5)}
+            className="px-3 py-1.5 rounded-lg hover:bg-white/10 text-white text-xs font-medium transition-colors ml-1"
+            title="Reset to Default (150%)"
+          >
+            Reset
           </button>
 
           {/* Fullscreen Toggle */}
@@ -169,11 +182,13 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
         >
           <Page 
             pageNumber={pageNumber} 
-            scale={scale}
+            scale={renderScale}
             renderTextLayer={true}
             renderAnnotationLayer={true}
             loading=""
-            className="shadow-2xl border border-white/10 rounded-lg overflow-hidden bg-white"
+            className="shadow-2xl rounded-lg overflow-hidden bg-white"
+            canvasBackground="white"
+            devicePixelRatio={2}
           />
         </Document>
       </div>

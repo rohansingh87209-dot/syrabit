@@ -4672,26 +4672,32 @@ async def upload_pdf_document(
         raise HTTPException(status_code=413, detail="PDF file too large (max 10MB)")
     
     # Extract text from PDF for RAG
+    extracted_text = ""
+    page_count = 0
+    is_scanned = False
+    
     try:
         from PyPDF2 import PdfReader
         import io
         
         pdf_reader = PdfReader(io.BytesIO(content))
-        extracted_text = ""
+        page_count = len(pdf_reader.pages)
+        
         for page in pdf_reader.pages:
             extracted_text += page.extract_text() + "\n"
         
         # Clean extracted text
         extracted_text = extracted_text.strip()
         
+        # Check if this is a scanned document (image-based PDF)
         if len(extracted_text) < 50:
-            raise HTTPException(status_code=400, detail="PDF appears to be empty or contains only images")
-        
-        page_count = len(pdf_reader.pages)
+            is_scanned = True
+            extracted_text = f"[Scanned Document - {file.filename}]\nThis is an image-based PDF (scanned question paper or document). Text extraction not available. OCR may be needed for text search."
+            logger.info(f"Scanned/image-based PDF detected: {file.filename}")
         
     except Exception as e:
-        logger.error(f"PDF text extraction failed: {e}")
-        raise HTTPException(status_code=400, detail=f"Failed to extract text from PDF: {str(e)}")
+        logger.error(f"PDF processing failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to process PDF: {str(e)}")
     
     # Upload to Supabase Storage
     try:
@@ -4744,7 +4750,8 @@ async def upload_pdf_document(
         "content_type": "application/pdf",
         "pdf_url": pdf_url,  # Supabase Storage URL
         "storage_path": storage_path,  # For deletion
-        "extracted_text": extracted_text,  # For RAG
+        "extracted_text": extracted_text,  # For RAG (or placeholder for scanned)
+        "is_scanned": is_scanned,  # Flag for image-based PDFs
         "page_count": page_count,
         "uploaded_by": admin.get("email"),
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
@@ -4758,7 +4765,7 @@ async def upload_pdf_document(
         {"$set": {"has_document": True}}
     )
     
-    logger.info(f"✅ PDF metadata saved: {file.filename} for subject {subject_id} ({file_size} bytes, {page_count} pages)")
+    logger.info(f"✅ PDF metadata saved: {file.filename} for subject {subject_id} ({file_size} bytes, {page_count} pages, scanned: {is_scanned})")
     
     return {
         "document_id": doc_id,
@@ -4767,8 +4774,9 @@ async def upload_pdf_document(
         "file_size": file_size,
         "page_count": page_count,
         "pdf_url": pdf_url,
+        "is_scanned": is_scanned,
         "text_length": len(extracted_text),
-        "message": "PDF uploaded successfully to Supabase Storage"
+        "message": "PDF uploaded successfully to Supabase Storage" + (" (scanned document - no text extracted)" if is_scanned else "")
     }
 
 

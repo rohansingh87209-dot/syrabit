@@ -401,6 +401,45 @@ export default function LibraryPage() {
   const [viewingDoc, setViewingDoc]     = useState(null);
   const [pdfToView, setPdfToView]       = useState(null);
   const [loadingPdf, setLoadingPdf]     = useState(false);
+  
+  // PDF Cache - stores fetched PDFs to avoid re-fetching
+  const [pdfCache] = useState(() => new Map());
+
+  // Preload PDFs for subjects with documents (in background after initial load)
+  useEffect(() => {
+    if (!subjects.length) return;
+    
+    // Prefetch PDFs for subjects with documents (limit to first 3 to avoid overwhelming)
+    const subjectsWithDocs = subjects.filter(s => s.has_document).slice(0, 3);
+    
+    const prefetchPdfs = async () => {
+      const API = process.env.REACT_APP_BACKEND_URL || '';
+      
+      for (const subject of subjectsWithDocs) {
+        // Skip if already cached
+        if (pdfCache.has(subject.id)) continue;
+        
+        try {
+          const response = await fetch(`${API}/api/content/subject-documents/${subject.id}?include_pdf=true`);
+          const docs = await response.json();
+          
+          if (docs && docs.length > 0 && docs[0].pdf_data_url) {
+            pdfCache.set(subject.id, docs[0]);
+          }
+        } catch (error) {
+          // Silent fail for prefetch
+          console.log(`Prefetch failed for ${subject.id}:`, error);
+        }
+        
+        // Small delay between prefetches to avoid overwhelming
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    };
+    
+    // Prefetch after 2 seconds to not block initial page load
+    const timeoutId = setTimeout(prefetchPdfs, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [subjects, pdfCache]);
 
   // ── React Query data ──────────────────────────────────────────────────────
   const { data: subjects = [],  isLoading: subjectsLoading, refetch: refetchSubjects } = useSubjects();
@@ -525,18 +564,33 @@ export default function LibraryPage() {
   const handleResetFilters = () => { setSearchQuery(''); setActiveFilter('all'); };
 
   const handleViewPdf = async (subjectId) => {
+    // Check cache first for instant loading
+    if (pdfCache.has(subjectId)) {
+      setPdfToView(pdfCache.get(subjectId));
+      return;
+    }
+
     setLoadingPdf(true);
     try {
       const API = process.env.REACT_APP_BACKEND_URL || '';
-      // Fetch documents for this subject
-      const response = await fetch(`${API}/api/content/subject-documents/${subjectId}`);
+      
+      // Single optimized call - include PDF data in one request
+      const response = await fetch(`${API}/api/content/subject-documents/${subjectId}?include_pdf=true`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
+      
       const docs = await response.json();
       
-      if (docs && docs.length > 0) {
-        // Get the first document's full details (includes pdf_data_url)
-        const docResponse = await fetch(`${API}/api/content/documents/${docs[0].id}`);
-        const docData = await docResponse.json();
-        setPdfToView(docData);
+      if (docs && docs.length > 0 && docs[0].pdf_data_url) {
+        const pdfData = docs[0];
+        
+        // Cache the PDF for instant future access
+        pdfCache.set(subjectId, pdfData);
+        
+        // Show PDF viewer
+        setPdfToView(pdfData);
       } else {
         toast.error('No PDF document found for this subject');
       }
@@ -755,12 +809,22 @@ export default function LibraryPage() {
         />
       )}
 
-      {/* Loading overlay for PDF */}
+      {/* Loading overlay for PDF with better animation */}
       {loadingPdf && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
-          <div className="text-white text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mx-auto mb-4"></div>
-            <p>Loading PDF...</p>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center">
+          <div className="text-center">
+            <div className="relative w-16 h-16 mx-auto mb-4">
+              {/* Outer ring */}
+              <div className="absolute inset-0 rounded-full border-4 border-purple-500/20"></div>
+              {/* Spinning ring */}
+              <div className="absolute inset-0 rounded-full border-t-4 border-purple-500 animate-spin"></div>
+              {/* Inner pulsing dot */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-3 h-3 rounded-full bg-purple-500 animate-pulse"></div>
+              </div>
+            </div>
+            <p className="text-white font-semibold text-lg">Loading PDF...</p>
+            <p className="text-gray-400 text-sm mt-1">Preparing document viewer</p>
           </div>
         </div>
       )}

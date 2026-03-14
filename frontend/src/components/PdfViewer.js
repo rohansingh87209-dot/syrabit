@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, X, Maximize2, Minimize2 } from 'lucide-react';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-// Set up PDF.js worker
+// Set up PDF.js worker with optimized settings
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
@@ -12,35 +12,68 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
   const [pageNumber, setPageNumber] = useState(1);
   const [scale, setScale] = useState(1.0);
   const [loading, setLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
-  function onDocumentLoadSuccess({ numPages }) {
+  // Memoize document load callbacks
+  const onDocumentLoadSuccess = useCallback(({ numPages }) => {
     setNumPages(numPages);
     setLoading(false);
-  }
+  }, []);
 
-  function onDocumentLoadError(error) {
+  const onDocumentLoadError = useCallback((error) => {
     console.error('PDF load error:', error);
     setLoading(false);
-  }
+  }, []);
 
-  const changePage = (offset) => {
-    setPageNumber(prevPageNumber => prevPageNumber + offset);
-  };
+  // Optimized page navigation
+  const changePage = useCallback((offset) => {
+    setPageNumber(prev => Math.max(1, Math.min(prev + offset, numPages || prev)));
+  }, [numPages]);
 
-  const previousPage = () => changePage(-1);
-  const nextPage = () => changePage(1);
+  const previousPage = useCallback(() => changePage(-1), [changePage]);
+  const nextPage = useCallback(() => changePage(1), [changePage]);
 
-  const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 3.0));
-  const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.5));
+  const zoomIn = useCallback(() => setScale(prev => Math.min(prev + 0.2, 3.0)), []);
+  const zoomOut = useCallback(() => setScale(prev => Math.max(prev - 0.2, 0.5)), []);
 
-  const downloadPdf = () => {
+  const downloadPdf = useCallback(() => {
     const link = document.createElement('a');
     link.href = pdfDataUrl;
     link.download = fileName || 'document.pdf';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
+  }, [pdfDataUrl, fileName]);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
+    }
+  }, []);
+
+  // Keyboard shortcuts
+  React.useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (e.key === 'Escape' && !document.fullscreenElement) onClose();
+      if (e.key === 'ArrowLeft') previousPage();
+      if (e.key === 'ArrowRight') nextPage();
+      if (e.key === '+' || e.key === '=') zoomIn();
+      if (e.key === '-') zoomOut();
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [onClose, previousPage, nextPage, zoomIn, zoomOut]);
+
+  // Memoize document options for better performance
+  const documentOptions = useMemo(() => ({
+    cMapUrl: `//unpkg.com/pdfjs-dist@${pdfjs.version}/cmaps/`,
+    cMapPacked: true,
+    standardFontDataUrl: `//unpkg.com/pdfjs-dist@${pdfjs.version}/standard_fonts/`,
+  }), []);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex flex-col">
@@ -84,10 +117,19 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
             <ZoomIn size={18} />
           </button>
 
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors"
+            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+          </button>
+
           {/* Download Button */}
           <button
             onClick={downloadPdf}
-            className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors ml-2"
+            className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors"
             title="Download PDF"
           >
             <Download size={18} />
@@ -96,8 +138,8 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
           {/* Close Button */}
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors ml-2"
-            title="Close"
+            className="p-2 rounded-lg hover:bg-white/10 text-white transition-colors"
+            title="Close (Esc)"
           >
             <X size={18} />
           </button>
@@ -105,11 +147,15 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
       </div>
 
       {/* PDF Content */}
-      <div className="flex-1 overflow-auto flex items-center justify-center p-4">
+      <div className="flex-1 overflow-auto flex items-center justify-center p-4 bg-gradient-to-b from-black/95 to-black/90">
         {loading && (
           <div className="text-white text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500 mx-auto mb-4"></div>
-            <p>Loading PDF...</p>
+            <div className="relative w-12 h-12 mx-auto mb-4">
+              <div className="absolute inset-0 rounded-full border-2 border-purple-500/30"></div>
+              <div className="absolute inset-0 rounded-full border-t-2 border-purple-500 animate-spin"></div>
+            </div>
+            <p className="text-sm">Loading PDF...</p>
+            {numPages && <p className="text-xs text-gray-400 mt-1">Rendering page {pageNumber} of {numPages}</p>}
           </div>
         )}
 
@@ -118,6 +164,7 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
           loading=""
+          options={documentOptions}
           className="shadow-2xl"
         >
           <Page 
@@ -125,7 +172,8 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
             scale={scale}
             renderTextLayer={true}
             renderAnnotationLayer={true}
-            className="shadow-2xl border border-white/10 rounded-lg overflow-hidden"
+            loading=""
+            className="shadow-2xl border border-white/10 rounded-lg overflow-hidden bg-white"
           />
         </Document>
       </div>

@@ -4741,11 +4741,26 @@ async def get_document(document_id: str):
 
 
 @api.get("/content/subject-documents/{subject_id}")
-async def get_subject_documents(subject_id: str):
-    """Get all documents for a subject"""
+async def get_subject_documents(subject_id: str, include_pdf: bool = False):
+    """
+    Get all documents for a subject.
+    
+    Query params:
+    - include_pdf: If true, includes pdf_data_url (default: false for performance)
+    """
+    projection = {"_id": 0}
+    
+    # Exclude large fields by default for performance
+    if not include_pdf:
+        projection["extracted_text"] = 0
+        projection["pdf_data_url"] = 0
+    else:
+        # Only exclude extracted_text when including PDF for viewing
+        projection["extracted_text"] = 0
+    
     docs = await db.content_uploads.find(
         {"subject_id": subject_id},
-        {"_id": 0, "extracted_text": 0}  # Exclude large text field
+        projection
     ).to_list(20)
     return docs
 

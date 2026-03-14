@@ -4,7 +4,7 @@ expertMode = true
 
 [nix]
 channel = "stable-25_05"
-packages = ["cargo", "libiconv", "libxcrypt", "rustc"]
+packages = ["cargo", "libiconv", "libxcrypt", "rustc", "mongodb"]
 
 [workflows]
 runButton = "Project"
@@ -21,6 +21,10 @@ args = "Backend API"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "Start application"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "MongoDB"
 
 [[workflows.workflow]]
 name = "Backend API"
@@ -44,6 +48,17 @@ outputType = "webview"
 task = "shell.exec"
 args = "cd frontend && PORT=5000 npm start"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "MongoDB"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "mkdir -p /home/runner/workspace/mongodb/data && mongod --dbpath /home/runner/workspace/mongodb/data --bind_ip 127.0.0.1 --port 27017 --noauth"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[ports]]
 localPort = 3000

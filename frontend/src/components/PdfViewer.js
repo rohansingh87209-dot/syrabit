@@ -7,7 +7,7 @@ import 'react-pdf/dist/Page/TextLayer.css';
 // Set up PDF.js worker with optimized settings
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
+const PdfViewer = ({ pdfDataUrl, pdfUrl, fileName, onClose }) => {
   const [numPages, setNumPages] = useState(null);
   const [scale, setScale] = useState(1.5); // Increased default scale for better readability
   const [loading, setLoading] = useState(true);
@@ -17,6 +17,9 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
   // Calculate optimal scale based on device
   const devicePixelRatio = window.devicePixelRatio || 1;
   const renderScale = scale * Math.min(devicePixelRatio, 2); // Cap at 2x for performance
+
+  // Use pdfUrl if available (new Supabase format), fallback to pdfDataUrl (old base64)
+  const fileSource = pdfUrl || pdfDataUrl;
 
   // Memoize document load callbacks
   const onDocumentLoadSuccess = useCallback(({ numPages }) => {
@@ -151,7 +154,7 @@ const PdfViewer = ({ pdfDataUrl, fileName, onClose }) => {
         )}
 
         <Document
-          file={pdfDataUrl}
+          file={fileSource}
           onLoadSuccess={onDocumentLoadSuccess}
           onLoadError={onDocumentLoadError}
           loading=""

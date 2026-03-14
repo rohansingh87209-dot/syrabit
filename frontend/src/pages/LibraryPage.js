@@ -807,6 +807,7 @@ export default function LibraryPage() {
       {pdfToView && (
         <PdfViewer
           pdfDataUrl={pdfToView.pdf_data_url}
+          pdfUrl={pdfToView.pdf_url}
           fileName={pdfToView.file_name || pdfToView.title}
           onClose={() => setPdfToView(null)}
         />

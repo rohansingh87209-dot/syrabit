@@ -4652,9 +4652,13 @@ async def upload_pdf_document(
     admin: dict = Depends(get_admin_user)
 ):
     """
-    Upload PDF document for a subject.
-    Extracts text for RAG and stores PDF as base64 for viewing.
+    Upload PDF document for a subject to Supabase Storage.
+    Extracts text for RAG and stores PDF URL from Supabase.
     """
+    # Validate Supabase is configured
+    if not supa:
+        raise HTTPException(status_code=503, detail="Supabase storage not configured")
+    
     # Validate file type
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files are supported")
@@ -4683,16 +4687,51 @@ async def upload_pdf_document(
         if len(extracted_text) < 50:
             raise HTTPException(status_code=400, detail="PDF appears to be empty or contains only images")
         
+        page_count = len(pdf_reader.pages)
+        
     except Exception as e:
         logger.error(f"PDF text extraction failed: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to extract text from PDF: {str(e)}")
     
-    # Convert PDF to base64 for storage and viewing
-    import base64
-    pdf_base64 = base64.b64encode(content).decode('utf-8')
-    pdf_data_url = f"data:application/pdf;base64,{pdf_base64}"
+    # Upload to Supabase Storage
+    try:
+        # Create unique filename with timestamp
+        import time
+        timestamp = int(time.time())
+        safe_filename = file.filename.replace(' ', '_').replace('/', '_')
+        storage_path = f"pdfs/{subject_id}/{timestamp}_{safe_filename}"
+        
+        # Ensure bucket exists (create if not)
+        try:
+            supa.storage.get_bucket("study-materials")
+        except:
+            try:
+                supa.storage.create_bucket("study-materials", options={"public": True})
+                logger.info("Created 'study-materials' bucket")
+            except Exception as bucket_err:
+                logger.warning(f"Bucket creation failed (may already exist): {bucket_err}")
+        
+        # Upload file to Supabase Storage
+        response = supa.storage.from_("study-materials").upload(
+            path=storage_path,
+            file=content,
+            file_options={
+                "content-type": "application/pdf",
+                "cache-control": "3600",
+                "upsert": "false"
+            }
+        )
+        
+        # Get public URL
+        pdf_url = supa.storage.from_("study-materials").get_public_url(storage_path)
+        
+        logger.info(f"✅ PDF uploaded to Supabase: {storage_path}")
+        
+    except Exception as storage_err:
+        logger.error(f"Supabase storage upload failed: {storage_err}")
+        raise HTTPException(status_code=500, detail=f"Failed to upload to storage: {str(storage_err)}")
     
-    # Create document record
+    # Create document record in MongoDB
     doc_id = str(uuid.uuid4())
     doc_title = title or file.filename
     
@@ -4703,9 +4742,10 @@ async def upload_pdf_document(
         "file_name": file.filename,
         "file_size": file_size,
         "content_type": "application/pdf",
-        "pdf_data_url": pdf_data_url,  # Base64 encoded PDF for viewer
+        "pdf_url": pdf_url,  # Supabase Storage URL
+        "storage_path": storage_path,  # For deletion
         "extracted_text": extracted_text,  # For RAG
-        "page_count": len(pdf_reader.pages),
+        "page_count": page_count,
         "uploaded_by": admin.get("email"),
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -4718,25 +4758,34 @@ async def upload_pdf_document(
         {"$set": {"has_document": True}}
     )
     
-    logger.info(f"PDF uploaded: {file.filename} for subject {subject_id} ({file_size} bytes, {len(pdf_reader.pages)} pages)")
+    logger.info(f"✅ PDF metadata saved: {file.filename} for subject {subject_id} ({file_size} bytes, {page_count} pages)")
     
     return {
         "document_id": doc_id,
         "title": doc_title,
         "file_name": file.filename,
         "file_size": file_size,
-        "page_count": len(pdf_reader.pages),
+        "page_count": page_count,
+        "pdf_url": pdf_url,
         "text_length": len(extracted_text),
-        "message": "PDF uploaded successfully"
+        "message": "PDF uploaded successfully to Supabase Storage"
     }
 
 
 @api.get("/content/documents/{document_id}")
 async def get_document(document_id: str):
-    """Get document details including PDF data URL for viewing"""
+    """
+    Get document details including PDF URL.
+    Supports both legacy base64 and new Supabase Storage URLs.
+    """
     doc = await db.content_uploads.find_one({"id": document_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+    
+    # For backward compatibility: if pdf_data_url exists (old format), keep it
+    # If pdf_url exists (new format), use it
+    # Frontend will handle both formats
+    
     return doc
 
 
@@ -4746,14 +4795,15 @@ async def get_subject_documents(subject_id: str, include_pdf: bool = False):
     Get all documents for a subject.
     
     Query params:
-    - include_pdf: If true, includes pdf_data_url (default: false for performance)
+    - include_pdf: If true, includes pdf_url or pdf_data_url (default: false for performance)
     """
     projection = {"_id": 0}
     
     # Exclude large fields by default for performance
     if not include_pdf:
         projection["extracted_text"] = 0
-        projection["pdf_data_url"] = 0
+        projection["pdf_data_url"] = 0  # Legacy base64
+        projection["pdf_url"] = 0        # New Supabase URL
     else:
         # Only exclude extracted_text when including PDF for viewing
         projection["extracted_text"] = 0
@@ -4767,11 +4817,26 @@ async def get_subject_documents(subject_id: str, include_pdf: bool = False):
 
 @api.delete("/admin/content/documents/{document_id}")
 async def delete_document(document_id: str, admin: dict = Depends(get_admin_user)):
-    """Delete uploaded document"""
+    """Delete uploaded document from both MongoDB and Supabase Storage"""
+    # Get document first to get storage path
+    doc = await db.content_uploads.find_one({"id": document_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Delete from Supabase Storage if it exists there
+    if doc.get("storage_path") and supa:
+        try:
+            supa.storage.from_("study-materials").remove([doc["storage_path"]])
+            logger.info(f"✅ Deleted PDF from Supabase: {doc['storage_path']}")
+        except Exception as e:
+            logger.warning(f"Failed to delete from Supabase storage: {e}")
+    
+    # Delete from MongoDB
     result = await db.content_uploads.delete_one({"id": document_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Document not found")
-    return {"message": "Document deleted successfully"}
+    
+    return {"message": "Document deleted successfully from both storage and database"}
 
 
 # ─────────────────────────────────────────────

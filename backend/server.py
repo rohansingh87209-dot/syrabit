@@ -4641,6 +4641,125 @@ async def regenerate_sitemap(admin: dict = Depends(get_admin_user)):
 
 
 # ─────────────────────────────────────────────
+# PDF DOCUMENT UPLOAD & VIEWER
+# ─────────────────────────────────────────────
+
+@api.post("/admin/content/upload-pdf")
+async def upload_pdf_document(
+    file: UploadFile = File(...),
+    subject_id: str = Form(...),
+    title: str = Form(None),
+    admin: dict = Depends(get_admin_user)
+):
+    """
+    Upload PDF document for a subject.
+    Extracts text for RAG and stores PDF as base64 for viewing.
+    """
+    # Validate file type
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+    
+    # Read file content
+    content = await file.read()
+    file_size = len(content)
+    
+    # Enforce size limit (10MB)
+    if file_size > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="PDF file too large (max 10MB)")
+    
+    # Extract text from PDF for RAG
+    try:
+        from PyPDF2 import PdfReader
+        import io
+        
+        pdf_reader = PdfReader(io.BytesIO(content))
+        extracted_text = ""
+        for page in pdf_reader.pages:
+            extracted_text += page.extract_text() + "\n"
+        
+        # Clean extracted text
+        extracted_text = extracted_text.strip()
+        
+        if len(extracted_text) < 50:
+            raise HTTPException(status_code=400, detail="PDF appears to be empty or contains only images")
+        
+    except Exception as e:
+        logger.error(f"PDF text extraction failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to extract text from PDF: {str(e)}")
+    
+    # Convert PDF to base64 for storage and viewing
+    import base64
+    pdf_base64 = base64.b64encode(content).decode('utf-8')
+    pdf_data_url = f"data:application/pdf;base64,{pdf_base64}"
+    
+    # Create document record
+    doc_id = str(uuid.uuid4())
+    doc_title = title or file.filename
+    
+    document = {
+        "id": doc_id,
+        "subject_id": subject_id,
+        "title": doc_title,
+        "file_name": file.filename,
+        "file_size": file_size,
+        "content_type": "application/pdf",
+        "pdf_data_url": pdf_data_url,  # Base64 encoded PDF for viewer
+        "extracted_text": extracted_text,  # For RAG
+        "page_count": len(pdf_reader.pages),
+        "uploaded_by": admin.get("email"),
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
+    }
+    
+    await db.content_uploads.insert_one(document)
+    
+    # Update subject to mark it has a document
+    await db.subjects.update_one(
+        {"id": subject_id},
+        {"$set": {"has_document": True}}
+    )
+    
+    logger.info(f"PDF uploaded: {file.filename} for subject {subject_id} ({file_size} bytes, {len(pdf_reader.pages)} pages)")
+    
+    return {
+        "document_id": doc_id,
+        "title": doc_title,
+        "file_name": file.filename,
+        "file_size": file_size,
+        "page_count": len(pdf_reader.pages),
+        "text_length": len(extracted_text),
+        "message": "PDF uploaded successfully"
+    }
+
+
+@api.get("/content/documents/{document_id}")
+async def get_document(document_id: str):
+    """Get document details including PDF data URL for viewing"""
+    doc = await db.content_uploads.find_one({"id": document_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return doc
+
+
+@api.get("/content/subject-documents/{subject_id}")
+async def get_subject_documents(subject_id: str):
+    """Get all documents for a subject"""
+    docs = await db.content_uploads.find(
+        {"subject_id": subject_id},
+        {"_id": 0, "extracted_text": 0}  # Exclude large text field
+    ).to_list(20)
+    return docs
+
+
+@api.delete("/admin/content/documents/{document_id}")
+async def delete_document(document_id: str, admin: dict = Depends(get_admin_user)):
+    """Delete uploaded document"""
+    result = await db.content_uploads.delete_one({"id": document_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"message": "Document deleted successfully"}
+
+
+# ─────────────────────────────────────────────
 # ENHANCED HEALTH
 # ─────────────────────────────────────────────
 import time as _time_mod

@@ -4971,7 +4971,10 @@ if FRONTEND_BUILD.is_dir():
                 response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
             return response
 
-    app.mount("/static", CachedStaticFiles(directory=str(FRONTEND_BUILD / "static")), name="static-assets")
+    # Only mount static if directory exists
+    static_dir = FRONTEND_BUILD / "static"
+    if static_dir.is_dir():
+        app.mount("/static", CachedStaticFiles(directory=str(static_dir)), name="static-assets")
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):

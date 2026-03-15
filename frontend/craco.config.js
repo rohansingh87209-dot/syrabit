@@ -82,17 +82,22 @@ webpackConfig.devServer = (devServerConfig) => {
   devServerConfig.port = 5000;
   devServerConfig.allowedHosts = "all";
 
-  const replitDomain = process.env.REPLIT_DEV_DOMAIN;
-  if (replitDomain) {
-    devServerConfig.client = {
-      ...devServerConfig.client,
-      webSocketURL: {
-        hostname: replitDomain,
-        port: 443,
-        protocol: "wss",
-      },
-    };
-  }
+  devServerConfig.webSocketServer = "ws";
+
+  devServerConfig.client = {
+    ...devServerConfig.client,
+    webSocketURL: "auto://0.0.0.0:0/ws",
+    overlay: {
+      errors: true,
+      warnings: false,
+    },
+  };
+
+  devServerConfig.headers = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "*",
+  };
 
   devServerConfig.proxy = [
     {

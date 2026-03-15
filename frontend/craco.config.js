@@ -82,6 +82,26 @@ webpackConfig.devServer = (devServerConfig) => {
   devServerConfig.port = 5000;
   devServerConfig.allowedHosts = "all";
 
+  const replitDomain = process.env.REPLIT_DEV_DOMAIN;
+  if (replitDomain) {
+    devServerConfig.client = {
+      ...devServerConfig.client,
+      webSocketURL: {
+        hostname: replitDomain,
+        port: 443,
+        protocol: "wss",
+      },
+    };
+  }
+
+  devServerConfig.proxy = [
+    {
+      context: ["/api", "/health", "/docs", "/openapi.json"],
+      target: "http://localhost:8000",
+      changeOrigin: true,
+    },
+  ];
+
   // Apply visual edits dev server setup only if enabled
   if (config.enableVisualEdits && setupDevServer) {
     devServerConfig = setupDevServer(devServerConfig);

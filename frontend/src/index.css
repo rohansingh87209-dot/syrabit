@@ -408,101 +408,33 @@
    SECTION 4 — COMPONENT CSS CLASSES
    ══════════════════════════════════════════════════════════════ */
 @layer components {
-  /* ── ANIMATED GRADIENT MESH BACKGROUND ── */
-  .futuristic-bg {
-    position: relative;
-    isolation: isolate;
-  }
-  .futuristic-bg::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-      radial-gradient(ellipse 600px 400px at 20% 20%, var(--glow-primary), transparent),
-      radial-gradient(ellipse 500px 350px at 80% 80%, var(--glow-secondary), transparent),
-      radial-gradient(ellipse 400px 300px at 60% 30%, var(--glow-accent), transparent);
-    pointer-events: none;
-    z-index: -2;
-    opacity: 0.4;
-    animation: meshFloat 20s ease-in-out infinite;
-  }
-
-  /* ── SUBTLE GRID OVERLAY ── */
-  .grid-overlay::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(hsl(var(--border) / 0.6) 1px, transparent 1px),
-      linear-gradient(90deg, hsl(var(--border) / 0.6) 1px, transparent 1px);
-    background-size: 60px 60px;
-    pointer-events: none;
-    z-index: -1;
-    opacity: 0.25;
-  }
-
-  /* ── GLASSMORPHISM CARD ── */
+  /* ── CLEAN CARD STYLE ── */
   .glass-card {
-    background: var(--card-glass);
-    backdrop-filter: blur(20px) saturate(1.5);
-    -webkit-backdrop-filter: blur(20px) saturate(1.5);
-    border: 1px solid var(--card-glass-border);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border) / 0.2);
   }
 
-  /* ── GLOW BORDER (mask-composite gradient border) ── */
-  .glow-border {
-    position: relative;
-  }
-  .glow-border::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    padding: 1px;
-    background: linear-gradient(
-      135deg,
-      var(--glow-primary),
-      transparent 40%,
-      transparent 60%,
-      var(--glow-secondary)
-    );
-    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-    mask-composite: exclude;
-    -webkit-mask-composite: xor;
-    pointer-events: none;
-  }
-
-  /* ── 3D CARD HOVER TILT ── */
+  /* ── SIMPLE CARD WITH SUBTLE SHADOW ── */
   .card-3d {
-    transition: transform 0.3s cubic-bezier(0.23, 1, 0.320, 1), box-shadow 0.3s cubic-bezier(0.23, 1, 0.320, 1);
-    transform-style: preserve-3d;
-    perspective: 1000px;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
   .card-3d:hover {
-    transform: translateY(-4px) rotateX(2deg);
-    box-shadow:
-      0 20px 40px rgba(124, 58, 237, 0.10),
-      0 8px 16px rgba(0, 0, 0, 0.06);
+    border-color: hsl(var(--border) / 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   }
 
-  /* ── SMOOTH BUTTON STYLES ── */
+  /* ── CLEAN BUTTON STYLES ── */
   .btn-smooth {
-    transition: all 0.2s cubic-bezier(0.23, 1, 0.320, 1);
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     outline: none;
-    border: none;
     cursor: pointer;
   }
-  .btn-smooth:hover {
-    transform: translateY(-1px);
-  }
   .btn-smooth:active {
-    transform: scale(0.95);
+    opacity: 0.8;
   }
   .btn-smooth:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
-    transform: none;
   }
 
   /* ── BUTTON GROUP ALIGNMENT ── */
@@ -520,61 +452,44 @@
     min-width: 100px;
   }
 
-  /* ── PRIMARY BUTTON ── */
+  /* ── PRIMARY BUTTON (solid, no gradient) ── */
   .btn-primary {
-    background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+    background: #7c3aed;
     color: white;
     font-weight: 600;
-    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
+    border: none;
   }
   .btn-primary:hover {
-    box-shadow: 0 6px 24px rgba(124, 58, 237, 0.45);
+    background: #6d28d9;
   }
 
   /* ── SECONDARY BUTTON ── */
   .btn-secondary {
     background: transparent;
     color: hsl(var(--muted-foreground));
-    border: 1px solid rgba(139, 92, 246, 0.15);
+    border: 1px solid hsl(var(--border) / 0.3);
   }
   .btn-secondary:hover {
-    background: rgba(139, 92, 246, 0.04);
-    border-color: rgba(139, 92, 246, 0.25);
-    color: hsl(var(--foreground));
+    background: hsl(var(--border) / 0.05);
+    border-color: hsl(var(--border) / 0.5);
   }
 
   /* ── TERTIARY (SAVED) BUTTON ── */
   .btn-tertiary {
-    background: rgba(139, 92, 246, 0.08);
-    color: hsl(var(--primary));
-    border: 1px solid rgba(139, 92, 246, 0.30);
+    background: #f3f4f6;
+    color: #7c3aed;
+    border: 1px solid hsl(var(--border) / 0.3);
   }
   .btn-tertiary:hover {
-    background: rgba(139, 92, 246, 0.12);
-    border-color: rgba(139, 92, 246, 0.40);
+    background: #e5e7eb;
   }
 
-  /* ── INPUT SMOOTH TRANSITIONS ── */
+  /* ── INPUT CLEAN TRANSITIONS ── */
   input, textarea, select {
-    transition: all 0.2s cubic-bezier(0.23, 1, 0.320, 1);
+    transition: border-color 0.15s ease, background-color 0.15s ease;
   }
   input:focus, textarea:focus, select:focus {
-    transform: translateY(-1px);
-  }
-
-  /* ── SMOOTH PAGE TRANSITIONS ── */
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  .page-enter {
-    animation: fadeInUp 0.3s cubic-bezier(0.23, 1, 0.320, 1);
+    border-color: hsl(var(--primary));
   }
 
   /* ── SIDEBAR NAV ACTIVE INDICATOR ── */

@@ -136,16 +136,9 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
     <div
       className="w-full rounded-2xl overflow-hidden card-3d transition-all duration-300"
       style={{
-        background: 'var(--card)',
-        backdropFilter: 'blur(20px) saturate(1.5)',
-        WebkitBackdropFilter: 'blur(20px) saturate(1.5)',
-        border: isSaved
-          ? '1px solid rgba(139,92,246,0.35)'
-          : '1px solid rgba(139,92,246,0.12)',
-        boxShadow: isSaved
-          ? '0 0 20px var(--glow-primary, rgba(139,92,246,0.15)), 0 4px 24px rgba(0,0,0,0.2)'
-          : '0 4px 24px rgba(0,0,0,0.15)',
-        animationDelay: `${index * 60}ms`,
+        background: 'hsl(var(--card))',
+        border: '1px solid hsl(var(--border) / 0.2)',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
       }}
       data-testid="library-subject-card"
       data-subject-id={sub.id}
@@ -191,45 +184,14 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
         />
 
         {/* Stream badge — top-left */}
-        <div
-          className="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-white text-xs font-semibold"
-          style={{
-            background: 'rgba(0,0,0,0.50)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: '1px solid rgba(255,255,255,0.10)',
-          }}
-        >
+        <div className="absolute top-3 left-3 px-2.5 py-1 rounded text-white text-xs font-medium bg-black/60">
           {sub.streamName || '—'}
         </div>
 
         {/* Class badge — top-right */}
-        <div
-          className="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-white text-xs font-semibold"
-          style={{
-            background: 'linear-gradient(135deg, rgba(124,58,237,0.85), rgba(139,92,246,0.85))',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            boxShadow: '0 2px 10px rgba(124,58,237,0.3)',
-          }}
-        >
+        <div className="absolute top-3 right-3 px-2.5 py-1 rounded text-white text-xs font-medium bg-purple-700">
           {sub.className || '—'}
         </div>
-
-        {/* Saved indicator — top-right, offset from class badge */}
-        {isSaved && (
-          <div
-            className="absolute top-3 flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-white"
-            style={{
-              right: '4.5rem',
-              background: 'rgba(124,58,237,0.70)',
-              backdropFilter: 'blur(12px)',
-              WebkitBackdropFilter: 'blur(12px)',
-            }}
-          >
-            <BookmarkCheck size={12} />
-          </div>
-        )}
 
         {/* Title overlay — bottom */}
         <div className="absolute bottom-3 left-3.5 right-3.5">
@@ -569,13 +531,10 @@ export default function LibraryPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Search subjects"
               placeholder="Search subjects, topics..."
-              className="w-full h-11 pl-10 pr-4 rounded-xl text-sm text-foreground outline-none transition-all focus:ring-2 focus:ring-primary/20"
+              className="w-full h-11 pl-10 pr-4 rounded-lg text-sm text-foreground outline-none transition-all border focus:border-primary"
               style={{
-                background: 'var(--card)',
-                backdropFilter: 'blur(20px)',
-                WebkitBackdropFilter: 'blur(20px)',
-                border: '1px solid rgba(139,92,246,0.15)',
-                color: 'hsl(var(--foreground))',
+                background: 'hsl(var(--card))',
+                border: '1px solid hsl(var(--border) / 0.2)',
               }}
               data-testid="library-search-input"
             />

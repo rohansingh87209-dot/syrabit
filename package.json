@@ -1,0 +1,8 @@
+{
+  "name": "syrabit-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "cd frontend && npm install && npm run build && rm -rf ../backend/frontend/build && mkdir -p ../backend/frontend && cp -r build ../backend/frontend/build"
+  }
+}

@@ -2005,6 +2005,8 @@ if _OPENAI_KEY and _OPENAI_KEY != 'x':
 _MODEL_PROVIDER_MAP = {
     "accounts/fireworks/models/qwen2p5-72b-instruct": "fireworksai",
     "accounts/fireworks/models/qwen3-235b-a22b": "fireworksai",
+    "openai/gpt-oss-20b": "groq",
+    "openai/gpt-oss-120b": "groq",
     "llama-3.3-70b-versatile": "groq",
     "llama-3.1-8b-instant": "groq",
 }

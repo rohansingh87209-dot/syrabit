@@ -23,8 +23,8 @@ const getToken = () => { try { return localStorage.getItem('syrabit:token') || n
 
 // ── Models (Groq) ─────────────────────────────────────────────────────────────
 const MODELS = [
-  { value: 'llama-3.3-70b-versatile', label: 'Syrabit SLM', badge: '⚡ Fast'  },
-  { value: 'qwen/qwen3-32b',          label: 'Syrabit MLM', badge: '🔜 Coming Soon', disabled: true },
+  { value: 'openai/gpt-oss-20b',      label: 'Syrabit SLM', badge: '⚡ Fast'  },
+  { value: 'openai/gpt-oss-120b',     label: 'Syrabit MLM', badge: '🧠 Smart'  },
 ];
 
 // ── Bubble animation variants ─────────────────────────────────────────────────
@@ -227,7 +227,7 @@ export default function ChatPage() {
   const [input, setInput]                 = useState('');
   const [isLoading, setIsLoading]         = useState(false);
   const [conversationId, setConversationId] = useState(convId || null);
-  const [model, setModel]                 = useState('llama-3.3-70b-versatile');
+  const [model, setModel]                 = useState('openai/gpt-oss-20b');
   const [subject, setSubject]             = useState(null);
   const [scopedChapters, setScopedChapters] = useState([]);
   const [credits, setCredits]             = useState({ used: user?.credits_used || 0, limit: user?.credits_limit || 0 });

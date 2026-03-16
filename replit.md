@@ -35,7 +35,7 @@ Syrabit.ai is an AI-powered exam prep platform for AHSEC (Class 11-12) and Degre
 ### backend/.env
 - `MONGO_URL=mongodb://localhost:27017` — local MongoDB
 - `LLM_PROVIDER=groq` — active LLM provider
-- `LLM_MODEL=llama-3.3-70b-versatile` — Groq model
+- `LLM_MODEL=openai/gpt-oss-20b` — Groq model (GPT-OSS-20B via Groq)
 - `FIREWORKS_API_KEY` — kept for fallback (account is currently suspended)
 - `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` — for user storage
 - `REDIS_URL` — Upstash Redis for caching/rate-limiting

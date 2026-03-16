@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Search, Bookmark, BookmarkCheck,
-  BookOpen, Layers, ChevronRight, Sparkles, FileText,
+  BookOpen, Layers, ChevronRight, Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
@@ -16,8 +16,6 @@ import {
   useSubjects, useBoards, useClasses, useStreams, useSavedSubjects,
 } from '@/hooks/useContent';
 import { useToggleSavedSubject } from '@/hooks/useUser';
-import DocumentViewerModal from '@/components/DocumentViewerModal';
-import PdfViewer from '@/components/PdfViewer';
 
 // ── Inline Globe SVG (no lucide Globe import in this file per spec) ──────────
 function Globe({ className }) {
@@ -120,7 +118,7 @@ function LibrarySkeleton() {
 }
 
 // ── Subject Card ──────────────────────────────────────────────────────────────
-const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, onViewPdf, index }) {
+const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, index }) {
   const thumbColors = THUMB_GRADIENTS[sub.gradient] || THUMB_GRADIENTS.math;
   const hasThumbnail = !!sub.thumbnailUrl;
   const tags = Array.isArray(sub.tags) ? sub.tags : [];
@@ -318,8 +316,8 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
           </Link>
         )}
 
-        {/* Action buttons - Grid layout based on hasDocument */}
-        <div className={hasDocument ? "grid grid-cols-2 gap-2 pt-1" : "flex gap-2 pt-1"}>
+        {/* Action buttons */}
+        <div className="flex gap-2 pt-1">
           {/* Save / Unsave */}
           <button
             onClick={() => onToggleSave(sub.id)}
@@ -335,34 +333,12 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
             {isSaved ? 'Saved' : 'Save'}
           </button>
 
-          {/* View PDF button - only show if document exists */}
-          {hasDocument && (
-            <button
-              onClick={() => onViewPdf && onViewPdf(sub.id)}
-              aria-label={`View PDF for ${sub.name}`}
-              className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
-              style={{ 
-                color: '#f87171', 
-                background: 'rgba(239,68,68,0.10)', 
-                border: '1px solid rgba(239,68,68,0.25)' 
-              }}
-              data-testid="subject-view-pdf-button"
-            >
-              <FileText size={14} />
-              View PDF
-            </button>
-          )}
-
           {/* Open - Goes to subject page */}
           <button
             onClick={() => onOpen(sub)}
             aria-label={`Open ${sub.name}`}
             className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
-            style={
-              hasDocument
-                ? { color: '#34d399', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)' }
-                : { color: 'hsl(var(--muted-foreground))', background: 'transparent', border: '1px solid rgba(139,92,246,0.15)' }
-            }
+            style={{ color: 'hsl(var(--muted-foreground))', background: 'transparent', border: '1px solid rgba(139,92,246,0.15)' }}
             data-testid="subject-open-button"
           >
             Open
@@ -372,15 +348,8 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
           <button
             onClick={() => onAskAI(sub.id, hasDocument)}
             aria-label={`Ask AI about ${sub.name}`}
-            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 hover:shadow-lg active:scale-95"
-            style={{
-              background: hasDocument
-                ? 'linear-gradient(135deg, #059669, #10b981)'
-                : 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
-              boxShadow: hasDocument
-                ? '0 4px 18px rgba(16,185,129,0.35)'
-                : '0 4px 18px var(--glow-primary, rgba(139,92,246,0.35))',
-            }}
+            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 hover:shadow-lg active:scale-95 flex-1"
+            style={{ background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)', boxShadow: '0 4px 18px var(--glow-primary, rgba(139,92,246,0.35))' }}
             data-testid="subject-ask-ai-button"
           >
             Ask AI
@@ -398,12 +367,6 @@ export default function LibraryPage() {
 
   const [searchQuery, setSearchQuery]   = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
-  const [viewingDoc, setViewingDoc]     = useState(null);
-  const [pdfToView, setPdfToView]       = useState(null);
-  const [loadingPdf, setLoadingPdf]     = useState(false);
-  
-  // PDF Cache - stores fetched PDFs to avoid re-fetching
-  const [pdfCache] = useState(() => new Map());
 
   // ── React Query data ──────────────────────────────────────────────────────
   const { data: subjects = [],  isLoading: subjectsLoading, refetch: refetchSubjects } = useSubjects();
@@ -438,8 +401,6 @@ export default function LibraryPage() {
     return () => window.removeEventListener('content-uploaded', handleContentUploaded);
   }, [refetchSubjects]);
 
-  // ── PDF Prefetch disabled for faster initial load ─────────────────────────
-  // Prefetch re-enabled only on-demand when user clicks "View PDF"
 
   // ── Data enrichment pipeline (memoized for O(1) lookup) ──────────────────
   const streamMap = useMemo(() => new Map(streams.map(s => [s.id, s])), [streams]);
@@ -537,45 +498,6 @@ export default function LibraryPage() {
     setSearchQuery('');
     setActiveFilter('all');
   }, []);
-
-  const handleViewPdf = async (subjectId) => {
-    // Check cache first for instant loading
-    if (pdfCache.has(subjectId)) {
-      setPdfToView(pdfCache.get(subjectId));
-      return;
-    }
-
-    setLoadingPdf(true);
-    try {
-      const API = process.env.REACT_APP_BACKEND_URL || '';
-      
-      // Single optimized call - include PDF data in one request
-      const response = await fetch(`${API}/api/content/subject-documents/${subjectId}?include_pdf=true`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch documents');
-      }
-      
-      const docs = await response.json();
-      
-      if (docs && docs.length > 0 && docs[0].pdf_data_url) {
-        const pdfData = docs[0];
-        
-        // Cache the PDF for instant future access
-        pdfCache.set(subjectId, pdfData);
-        
-        // Show PDF viewer
-        setPdfToView(pdfData);
-      } else {
-        toast.error('No PDF document found for this subject');
-      }
-    } catch (error) {
-      console.error('Failed to load PDF:', error);
-      toast.error('Failed to load PDF document');
-    } finally {
-      setLoadingPdf(false);
-    }
-  };
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (subjectsLoading) {
@@ -757,7 +679,6 @@ export default function LibraryPage() {
                   onOpen={handleOpen}
                   onAskAI={handleAskAI}
                   onSeoNav={handleSeoNav}
-                  onViewPdf={handleViewPdf}
                   index={index}
                 />
               ))}
@@ -766,44 +687,6 @@ export default function LibraryPage() {
         </div>
       </div>
 
-      {/* ── Document Viewer Modal ── */}
-      {viewingDoc && (
-        <DocumentViewerModal
-          subjectId={viewingDoc.id}
-          subjectName={viewingDoc.name}
-          onClose={() => setViewingDoc(null)}
-        />
-      )}
-
-      {/* ── PDF Viewer ── */}
-      {pdfToView && (
-        <PdfViewer
-          pdfDataUrl={pdfToView.pdf_data_url}
-          pdfUrl={pdfToView.pdf_url}
-          fileName={pdfToView.file_name || pdfToView.title}
-          onClose={() => setPdfToView(null)}
-        />
-      )}
-
-      {/* Loading overlay for PDF with better animation */}
-      {loadingPdf && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center">
-          <div className="text-center">
-            <div className="relative w-16 h-16 mx-auto mb-4">
-              {/* Outer ring */}
-              <div className="absolute inset-0 rounded-full border-4 border-purple-500/20"></div>
-              {/* Spinning ring */}
-              <div className="absolute inset-0 rounded-full border-t-4 border-purple-500 animate-spin"></div>
-              {/* Inner pulsing dot */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-purple-500 animate-pulse"></div>
-              </div>
-            </div>
-            <p className="text-white font-semibold text-lg">Loading PDF...</p>
-            <p className="text-gray-400 text-sm mt-1">Preparing document viewer</p>
-          </div>
-        </div>
-      )}
     </AppLayout>
   );
 }

@@ -1,7 +1,7 @@
 /**
  * LibraryPage — /library
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Search, Bookmark, BookmarkCheck,
@@ -120,7 +120,7 @@ function LibrarySkeleton() {
 }
 
 // ── Subject Card ──────────────────────────────────────────────────────────────
-function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, onViewPdf, index }) {
+const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, onViewPdf, index }) {
   const thumbColors = THUMB_GRADIENTS[sub.gradient] || THUMB_GRADIENTS.math;
   const hasThumbnail = !!sub.thumbnailUrl;
   const tags = Array.isArray(sub.tags) ? sub.tags : [];
@@ -389,7 +389,7 @@ function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, on
       </div>
     </div>
   );
-}
+});
 
 // ── LibraryPage ───────────────────────────────────────────────────────────────
 export default function LibraryPage() {
@@ -438,92 +438,63 @@ export default function LibraryPage() {
     return () => window.removeEventListener('content-uploaded', handleContentUploaded);
   }, [refetchSubjects]);
 
-  // ── Preload PDFs for subjects with documents (background prefetch) ───────────
-  useEffect(() => {
-    if (!subjects || subjects.length === 0) return;
-    
-    // Prefetch PDFs for subjects with documents (limit to first 3 to avoid overwhelming)
-    const subjectsWithDocs = subjects.filter(s => s.has_document).slice(0, 3);
-    
-    if (subjectsWithDocs.length === 0) return;
-    
-    const prefetchPdfs = async () => {
-      const API = process.env.REACT_APP_BACKEND_URL || '';
-      
-      for (const subject of subjectsWithDocs) {
-        // Skip if already cached
-        if (pdfCache.has(subject.id)) continue;
-        
-        try {
-          const response = await fetch(`${API}/api/content/subject-documents/${subject.id}?include_pdf=true`);
-          const docs = await response.json();
-          
-          if (docs && docs.length > 0 && docs[0].pdf_data_url) {
-            pdfCache.set(subject.id, docs[0]);
-            console.log(`✅ Prefetched PDF for ${subject.name}`);
-          }
-        } catch (error) {
-          // Silent fail for prefetch
-          console.log(`Prefetch skipped for ${subject.name}`);
-        }
-        
-        // Small delay between prefetches to avoid overwhelming
-        await new Promise(resolve => setTimeout(resolve, 500));
+  // ── PDF Prefetch disabled for faster initial load ─────────────────────────
+  // Prefetch re-enabled only on-demand when user clicks "View PDF"
+
+  // ── Data enrichment pipeline (memoized for O(1) lookup) ──────────────────
+  const streamMap = useMemo(() => new Map(streams.map(s => [s.id, s])), [streams]);
+  const classMap = useMemo(() => new Map(classes.map(c => [c.id, c])), [classes]);
+  const boardMap = useMemo(() => new Map(boards.map(b => [b.id, b])), [boards]);
+
+  const enrichedSubjects = useMemo(() => {
+    return subjects.map((sub) => {
+      const stream = streamMap.get(sub.stream_id);
+      const cls = classMap.get(stream?.class_id);
+      const board = boardMap.get(cls?.board_id);
+      return {
+        ...sub,
+        boardName: board?.name || '',
+        className: cls?.name || '',
+        streamName: stream?.name || '',
+        boardSlug: board?.slug || '',
+        classSlug: cls?.slug || '',
+        streamSlug: stream?.slug || '',
+      };
+    });
+  }, [subjects, streamMap, classMap, boardMap]);
+
+  // ── Filter + search pipeline (memoized to avoid re-filtering on re-render) ──
+  const savedSubjectsSet = useMemo(() => new Set(savedSubjects), [savedSubjects]);
+  const filteredSubjects = useMemo(() => {
+    return enrichedSubjects.filter((sub) => {
+      // Gate 1: published only
+      if (sub.status && sub.status !== 'published') return false;
+
+      // Gate 2: filter chip
+      if (activeFilter === 'all') {
+        // pass
+      } else if (activeFilter === 'saved') {
+        if (!savedSubjectsSet.has(sub.id)) return false;
+      } else if (['class-11', 'class-12', '2nd-sem', '4th-sem'].includes(activeFilter)) {
+        if (sub.classSlug !== activeFilter) return false;
+      } else {
+        if (sub.streamSlug !== activeFilter) return false;
       }
-    };
-    
-    // Prefetch after 2 seconds to not block initial page load
-    const timeoutId = setTimeout(prefetchPdfs, 2000);
-    return () => clearTimeout(timeoutId);
-  }, [subjects, pdfCache]);
 
-  // ── Data enrichment pipeline ──────────────────────────────────────────────
-  const enrichedSubjects = subjects.map((sub) => {
-    const stream = streams.find((s) => s.id === sub.stream_id);
-    const cls    = classes.find((c) => c.id === stream?.class_id);
-    const board  = boards.find((b)  => b.id === cls?.board_id);
-    return {
-      ...sub,
-      boardName:  board?.name  || '',
-      className:  cls?.name    || '',
-      streamName: stream?.name || '',
-      boardSlug:  board?.slug  || '',
-      classSlug:  cls?.slug    || '',
-      streamSlug: stream?.slug || '',
-    };
-  });
+      // Gate 3: search
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const inName = sub.name?.toLowerCase().includes(q);
+        const inTags = Array.isArray(sub.tags) && sub.tags.some((t) => t.toLowerCase().includes(q));
+        const inClass = sub.className?.toLowerCase().includes(q);
+        const inStream = sub.streamName?.toLowerCase().includes(q);
+        const inBoard = sub.boardName?.toLowerCase().includes(q);
+        if (!inName && !inTags && !inClass && !inStream && !inBoard) return false;
+      }
 
-  // ── Filter + search pipeline ──────────────────────────────────────────────
-  const filteredSubjects = enrichedSubjects.filter((sub) => {
-    // Gate 1: published only
-    if (sub.status && sub.status !== 'published') return false;
-
-    // Gate 2: filter chip
-    if (activeFilter === 'all') {
-      // pass
-    } else if (activeFilter === 'saved') {
-      if (!savedSubjects.includes(sub.id)) return false;
-    } else if (['class-11', 'class-12', '2nd-sem', '4th-sem'].includes(activeFilter)) {
-      // class-level filter
-      if (sub.classSlug !== activeFilter) return false;
-    } else {
-      // stream slug: science-pcm / science-pcb / arts / bcom / ba / bsc
-      if (sub.streamSlug !== activeFilter) return false;
-    }
-
-    // Gate 3: search
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const inName   = sub.name?.toLowerCase().includes(q);
-      const inTags   = Array.isArray(sub.tags) && sub.tags.some((t) => t.toLowerCase().includes(q));
-      const inClass  = sub.className?.toLowerCase().includes(q);
-      const inStream = sub.streamName?.toLowerCase().includes(q);
-      const inBoard  = sub.boardName?.toLowerCase().includes(q);
-      if (!inName && !inTags && !inClass && !inStream && !inBoard) return false;
-    }
-
-    return true;
-  });
+      return true;
+    });
+  }, [enrichedSubjects, activeFilter, searchQuery, savedSubjectsSet]);
 
   // ── JSON-LD ItemList schema ───────────────────────────────────────────────
   useEffect(() => {
@@ -550,21 +521,22 @@ export default function LibraryPage() {
     return () => { const el = document.getElementById('library-jsonld'); if (el) el.remove(); };
   }, [filteredSubjects]);
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
-  const handleOpen = (sub) => {
-    // Always navigate to subject page to show chapters
+  // ── Handlers (memoized to avoid re-creating on every render) ───────────────
+  const handleOpen = useCallback((sub) => {
     navigate(`/subject/${sub.id}`);
-  };
+  }, [navigate]);
 
-  // Ask AI — if subject has document, pass document_id so chat uses it as Tier 0 RAG
-  const handleAskAI = (subjectId, hasDocument = false) => {
+  const handleAskAI = useCallback((subjectId, hasDocument = false) => {
     const params = new URLSearchParams({ subject: subjectId });
-    if (hasDocument) params.set('document_id', subjectId); // same as subject_id
+    if (hasDocument) params.set('document_id', subjectId);
     navigate(`/chat?${params.toString()}`);
-  };
+  }, [navigate]);
 
-  const handleSeoNav  = (path) => navigate(path);
-  const handleResetFilters = () => { setSearchQuery(''); setActiveFilter('all'); };
+  const handleSeoNav = useCallback((path) => navigate(path), [navigate]);
+  const handleResetFilters = useCallback(() => {
+    setSearchQuery('');
+    setActiveFilter('all');
+  }, []);
 
   const handleViewPdf = async (subjectId) => {
     // Check cache first for instant loading

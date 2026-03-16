@@ -13,7 +13,7 @@ import PageMeta from '@/components/seo/PageMeta';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useAuth } from '@/context/AuthContext';
 import {
-  useSubjects, useBoards, useClasses, useStreams, useSavedSubjects,
+  useLibraryBundle, useSavedSubjects,
 } from '@/hooks/useContent';
 import { useToggleSavedSubject } from '@/hooks/useUser';
 
@@ -414,12 +414,13 @@ export default function LibraryPage() {
   const [searchQuery, setSearchQuery]   = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
 
-  // ── React Query data ──────────────────────────────────────────────────────
-  const { data: subjects = [],  isLoading: subjectsLoading, refetch: refetchSubjects } = useSubjects();
-  const { data: boards   = [] }                               = useBoards();
-  const { data: classes  = [] }                               = useClasses();
-  const { data: streams  = [] }                               = useStreams();
-  const { data: savedSubjects = [] }                          = useSavedSubjects(token, user);
+  // ── Single API call for all library data ─────────────────────────────────
+  const { data: bundle, isLoading: bundleLoading, refetch: refetchBundle } = useLibraryBundle();
+  const subjects = bundle?.subjects || [];
+  const boards   = bundle?.boards   || [];
+  const classes  = bundle?.classes  || [];
+  const streams  = bundle?.streams  || [];
+  const { data: savedSubjects = [] } = useSavedSubjects(token, user);
   const toggleSaved = useToggleSavedSubject(token);
 
   // ── Auto-select stream from onboarding ───────────────────────────────
@@ -437,12 +438,12 @@ export default function LibraryPage() {
   useEffect(() => {
     const handleContentUploaded = () => {
       console.log('Content uploaded - refreshing subjects');
-      refetchSubjects();
+      refetchBundle();
     };
     
     window.addEventListener('content-uploaded', handleContentUploaded);
     return () => window.removeEventListener('content-uploaded', handleContentUploaded);
-  }, [refetchSubjects]);
+  }, [refetchBundle]);
 
   // ── Data enrichment pipeline (memoized for O(1) lookup) ──────────────────
   const streamMap = useMemo(() => new Map(streams.map(s => [s.id, s])), [streams]);
@@ -542,9 +543,9 @@ export default function LibraryPage() {
   }, []);
 
   const handleRefetchSubjects = useCallback(() => {
-    refetchSubjects();
+    refetchBundle();
     toast.success('Library updated!');
-  }, [refetchSubjects]);
+  }, [refetchBundle]);
 
   const handleSearchChange = useCallback((e) => {
     setSearchQuery(e.target.value);
@@ -559,7 +560,7 @@ export default function LibraryPage() {
   }, []);
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
-  if (subjectsLoading) {
+  if (bundleLoading) {
     return (
       <AppLayout pageTitle="Library">
         <PageMeta

@@ -20,6 +20,9 @@ const fetchStreams = () =>
 const fetchSubjects = () =>
   axios.get(`${API_BASE}/content/subjects`).then((r) => r.data);
 
+const fetchLibraryBundle = () =>
+  axios.get(`${API_BASE}/content/library-bundle`).then((r) => r.data);
+
 const fetchSubject = (id) =>
   axios.get(`${API_BASE}/content/subjects/${id}`).then((r) => r.data);
 
@@ -105,4 +108,12 @@ export const useSavedSubjects = (token, user) =>
     queryFn: () => fetchSavedSubjects(token),
     staleTime: 1 * 60 * 1000,
     enabled: !!token || !!user,
+  });
+
+export const useLibraryBundle = () =>
+  useQuery({
+    queryKey: ['library-bundle'],
+    queryFn: fetchLibraryBundle,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   });

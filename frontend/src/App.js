@@ -16,11 +16,19 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000,
-      gcTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
       retry: 2,
       refetchOnWindowFocus: false,
     },
   },
+});
+
+import axios from 'axios';
+const API_BASE = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
+queryClient.prefetchQuery({
+  queryKey: ['library-bundle'],
+  queryFn: () => axios.get(`${API_BASE}/content/library-bundle`).then(r => r.data),
+  staleTime: 30 * 60 * 1000,
 });
 
 // ── React.lazy() code splitting — all pages ────────────────────────────────

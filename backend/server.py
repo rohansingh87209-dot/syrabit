@@ -2547,6 +2547,23 @@ async def get_me(user: dict = Depends(get_current_user)):
 # ─────────────────────────────────────────────
 # CONTENT ROUTES
 # ─────────────────────────────────────────────
+@api.get("/content/library-bundle")
+async def get_library_bundle(nocache: Optional[str] = None):
+    if not nocache:
+        cached = _get_content_cache("library-bundle")
+        if cached: return cached
+    await ensure_seeded()
+    boards_data = await db.boards.find({}, {"_id": 0}).to_list(100)
+    classes_data = await db.classes.find({}, {"_id": 0}).to_list(100)
+    streams_data = await db.streams.find({}, {"_id": 0}).to_list(100)
+    subjects_data = await db.subjects.find({"status": "published"}, {"_id": 0}).to_list(500)
+    for s in subjects_data:
+        if "thumbnail_url" in s and "thumbnailUrl" not in s:
+            s["thumbnailUrl"] = s.pop("thumbnail_url")
+    bundle = {"boards": boards_data, "classes": classes_data, "streams": streams_data, "subjects": subjects_data}
+    _set_content_cache("library-bundle", bundle)
+    return bundle
+
 @api.get("/content/boards")
 async def get_boards(nocache: Optional[str] = None):
     if not nocache:

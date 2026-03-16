@@ -21,7 +21,7 @@ export default function AdminLoginPage() {
     try {
       const res = await adminLogin(email, password);
       if (res.data?.access_token) {
-        localStorage.setItem('syrabit:admin_token', res.data.access_token);
+        sessionStorage.setItem('syrabit:admin_token', res.data.access_token);
       }
       toast.success(`Welcome back, ${res.data.name || 'Admin'}!`, {
         description: 'Admin session started',

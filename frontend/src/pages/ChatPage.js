@@ -240,12 +240,12 @@ export default function ChatPage() {
   const textareaRef       = useRef(null);
   const abortControllerRef = useRef(null);
 
-  // ── Auto-scroll (high-frequency for max streaming speed) ──────────────────
+  // ── Auto-scroll (smooth yet responsive) ──────────────────────────────────
   const scrollTimeoutRef = useRef(null);
   useEffect(() => {
     if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
     scrollTimeoutRef.current = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 0);
     return () => { if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current); };
   }, [messages]);

@@ -316,18 +316,14 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
           </Link>
         )}
 
-        {/* Action buttons */}
-        <div className="flex gap-2 pt-1">
+        {/* Action buttons — perfectly aligned */}
+        <div className="btn-group">
           {/* Save / Unsave */}
           <button
             onClick={() => onToggleSave(sub.id)}
             aria-label={isSaved ? `Unsave ${sub.name}` : `Save ${sub.name}`}
-            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
-            style={
-              isSaved
-                ? { color: 'hsl(var(--primary))', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.30)' }
-                : { color: 'hsl(var(--muted-foreground))', background: 'transparent', border: '1px solid rgba(139,92,246,0.15)' }
-            }
+            className={`btn-smooth btn-secondary h-10 px-3.5 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5`}
+            style={isSaved ? { backgroundColor: 'rgba(139,92,246,0.08)', borderColor: 'rgba(139,92,246,0.30)', color: 'hsl(var(--primary))' } : undefined}
             data-testid="subject-bookmark-button"
           >
             {isSaved ? 'Saved' : 'Save'}
@@ -337,21 +333,20 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
           <button
             onClick={() => onOpen(sub)}
             aria-label={`Open ${sub.name}`}
-            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
-            style={{ color: 'hsl(var(--muted-foreground))', background: 'transparent', border: '1px solid rgba(139,92,246,0.15)' }}
+            className="btn-smooth btn-secondary h-10 px-3.5 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5"
             data-testid="subject-open-button"
           >
             Open
           </button>
 
-          {/* Ask AI — gradient button */}
+          {/* Ask AI — primary button, takes remaining space */}
           <button
             onClick={() => onAskAI(sub.id, hasDocument)}
             aria-label={`Ask AI about ${sub.name}`}
-            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 hover:shadow-lg active:scale-95 flex-1"
-            style={{ background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)', boxShadow: '0 4px 18px var(--glow-primary, rgba(139,92,246,0.35))' }}
+            className="btn-smooth btn-primary btn-primary h-10 px-4 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-1.5"
             data-testid="subject-ask-ai-button"
           >
+            <Sparkles size={14} aria-hidden="true" />
             Ask AI
           </button>
         </div>

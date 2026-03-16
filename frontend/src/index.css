@@ -475,7 +475,7 @@
 
   /* ── 3D CARD HOVER TILT ── */
   .card-3d {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: transform 0.3s cubic-bezier(0.23, 1, 0.320, 1), box-shadow 0.3s cubic-bezier(0.23, 1, 0.320, 1);
     transform-style: preserve-3d;
     perspective: 1000px;
   }
@@ -484,6 +484,97 @@
     box-shadow:
       0 20px 40px rgba(124, 58, 237, 0.10),
       0 8px 16px rgba(0, 0, 0, 0.06);
+  }
+
+  /* ── SMOOTH BUTTON STYLES ── */
+  .btn-smooth {
+    transition: all 0.2s cubic-bezier(0.23, 1, 0.320, 1);
+    outline: none;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-smooth:hover {
+    transform: translateY(-1px);
+  }
+  .btn-smooth:active {
+    transform: scale(0.95);
+  }
+  .btn-smooth:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* ── BUTTON GROUP ALIGNMENT ── */
+  .btn-group {
+    display: flex;
+    gap: 0.5rem;
+    width: 100%;
+    align-items: center;
+  }
+  .btn-group .btn-secondary {
+    flex: 0 0 auto;
+  }
+  .btn-group .btn-primary {
+    flex: 1;
+    min-width: 100px;
+  }
+
+  /* ── PRIMARY BUTTON ── */
+  .btn-primary {
+    background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 6px 24px rgba(124, 58, 237, 0.45);
+  }
+
+  /* ── SECONDARY BUTTON ── */
+  .btn-secondary {
+    background: transparent;
+    color: hsl(var(--muted-foreground));
+    border: 1px solid rgba(139, 92, 246, 0.15);
+  }
+  .btn-secondary:hover {
+    background: rgba(139, 92, 246, 0.04);
+    border-color: rgba(139, 92, 246, 0.25);
+    color: hsl(var(--foreground));
+  }
+
+  /* ── TERTIARY (SAVED) BUTTON ── */
+  .btn-tertiary {
+    background: rgba(139, 92, 246, 0.08);
+    color: hsl(var(--primary));
+    border: 1px solid rgba(139, 92, 246, 0.30);
+  }
+  .btn-tertiary:hover {
+    background: rgba(139, 92, 246, 0.12);
+    border-color: rgba(139, 92, 246, 0.40);
+  }
+
+  /* ── INPUT SMOOTH TRANSITIONS ── */
+  input, textarea, select {
+    transition: all 0.2s cubic-bezier(0.23, 1, 0.320, 1);
+  }
+  input:focus, textarea:focus, select:focus {
+    transform: translateY(-1px);
+  }
+
+  /* ── SMOOTH PAGE TRANSITIONS ── */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .page-enter {
+    animation: fadeInUp 0.3s cubic-bezier(0.23, 1, 0.320, 1);
   }
 
   /* ── SIDEBAR NAV ACTIVE INDICATOR ── */

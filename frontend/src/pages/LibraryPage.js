@@ -535,13 +535,10 @@ export default function LibraryPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Search subjects"
               placeholder="Search subjects, topics..."
-              className="w-full h-11 pl-10 pr-4 rounded-lg text-sm text-foreground outline-none transition-all border focus:border-primary focus:ring-2 focus:ring-offset-0"
+              className="w-full h-11 pl-10 pr-4 rounded-lg text-sm text-foreground outline-none transition-all border focus:border-primary"
               style={{
-                background: 'var(--input-bg)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                border: '1px solid var(--card-glass-border)',
-                focusRing: '2px solid rgba(124, 58, 237, 0.1)',
+                background: 'rgba(139, 92, 246, 0.04)',
+                border: '1px solid rgba(139, 92, 246, 0.12)',
               }}
               data-testid="library-search-input"
             />

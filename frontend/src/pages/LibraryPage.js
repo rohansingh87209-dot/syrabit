@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Search, Bookmark, BookmarkCheck,
-  BookOpen, Layers, ChevronRight, Sparkles,
+  BookOpen, Layers, ChevronRight, Sparkles, FileText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Toaster } from '@/components/ui/sonner';
@@ -127,7 +127,7 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
   const chapterCount = sub.chapter_count || sub.chapterCount || 0;
   const totalTokens = sub.total_tokens || sub.totalTokens || 0;
   const totalChats = sub.total_chats || sub.totalChats || 0;
-  const hasDocument = sub.has_document === true;  // admin uploaded a text file
+  const hasDocument = sub.has_document === true;
   const seoPath = sub.boardSlug && sub.classSlug && sub.streamSlug && sub.slug
     ? `/${sub.boardSlug}/${sub.classSlug}/${sub.streamSlug}/${sub.slug}`
     : null;
@@ -136,9 +136,16 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
     <div
       className="w-full rounded-2xl overflow-hidden card-3d transition-all duration-300"
       style={{
-        background: 'hsl(var(--card))',
-        border: '1px solid hsl(var(--border) / 0.15)',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+        background: 'var(--card)',
+        backdropFilter: 'blur(20px) saturate(1.5)',
+        WebkitBackdropFilter: 'blur(20px) saturate(1.5)',
+        border: isSaved
+          ? '1px solid rgba(139,92,246,0.35)'
+          : '1px solid rgba(139,92,246,0.12)',
+        boxShadow: isSaved
+          ? '0 0 20px var(--glow-primary, rgba(139,92,246,0.15)), 0 4px 24px rgba(0,0,0,0.2)'
+          : '0 4px 24px rgba(0,0,0,0.15)',
+        animationDelay: `${index * 60}ms`,
       }}
       data-testid="library-subject-card"
       data-subject-id={sub.id}
@@ -184,14 +191,45 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
         />
 
         {/* Stream badge — top-left */}
-        <div className="absolute top-3 left-3 px-2.5 py-1 rounded text-white text-xs font-medium bg-black/60">
+        <div
+          className="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-white text-xs font-semibold"
+          style={{
+            background: 'rgba(0,0,0,0.50)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255,255,255,0.10)',
+          }}
+        >
           {sub.streamName || '—'}
         </div>
 
         {/* Class badge — top-right */}
-        <div className="absolute top-3 right-3 px-2.5 py-1 rounded text-white text-xs font-medium bg-purple-700">
+        <div
+          className="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-white text-xs font-semibold"
+          style={{
+            background: 'linear-gradient(135deg, rgba(124,58,237,0.85), rgba(139,92,246,0.85))',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            boxShadow: '0 2px 10px rgba(124,58,237,0.3)',
+          }}
+        >
           {sub.className || '—'}
         </div>
+
+        {/* Saved indicator — top-right, offset from class badge */}
+        {isSaved && (
+          <div
+            className="absolute top-3 flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-white"
+            style={{
+              right: '4.5rem',
+              background: 'rgba(124,58,237,0.70)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+            }}
+          >
+            <BookmarkCheck size={12} />
+          </div>
+        )}
 
         {/* Title overlay — bottom */}
         <div className="absolute bottom-3 left-3.5 right-3.5">
@@ -278,14 +316,18 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
           </Link>
         )}
 
-        {/* Action buttons — perfectly aligned */}
-        <div className="btn-group">
+        {/* Action buttons — simplified (no PDF button) */}
+        <div className="flex gap-2 pt-1">
           {/* Save / Unsave */}
           <button
             onClick={() => onToggleSave(sub.id)}
             aria-label={isSaved ? `Unsave ${sub.name}` : `Save ${sub.name}`}
-            className={`btn-smooth btn-secondary h-10 px-3.5 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5`}
-            style={isSaved ? { backgroundColor: 'rgba(139,92,246,0.08)', borderColor: 'rgba(139,92,246,0.30)', color: 'hsl(var(--primary))' } : undefined}
+            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
+            style={
+              isSaved
+                ? { color: 'hsl(var(--primary))', background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.30)' }
+                : { color: 'hsl(var(--muted-foreground))', background: 'transparent', border: '1px solid rgba(139,92,246,0.15)' }
+            }
             data-testid="subject-bookmark-button"
           >
             {isSaved ? 'Saved' : 'Save'}
@@ -295,20 +337,33 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
           <button
             onClick={() => onOpen(sub)}
             aria-label={`Open ${sub.name}`}
-            className="btn-smooth btn-secondary h-10 px-3.5 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5"
+            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
+            style={
+              hasDocument
+                ? { color: '#34d399', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)' }
+                : { color: 'hsl(var(--muted-foreground))', background: 'transparent', border: '1px solid rgba(139,92,246,0.15)' }
+            }
             data-testid="subject-open-button"
           >
             Open
           </button>
 
-          {/* Ask AI — primary button, takes remaining space */}
+          {/* Ask AI — gradient button */}
           <button
             onClick={() => onAskAI(sub.id, hasDocument)}
             aria-label={`Ask AI about ${sub.name}`}
-            className="btn-smooth btn-primary btn-primary h-10 px-4 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-1.5"
+            className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 hover:shadow-lg active:scale-95"
+            style={{
+              background: hasDocument
+                ? 'linear-gradient(135deg, #059669, #10b981)'
+                : 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
+              boxShadow: hasDocument
+                ? '0 4px 18px rgba(16,185,129,0.35)'
+                : '0 4px 18px var(--glow-primary, rgba(139,92,246,0.35))',
+            }}
             data-testid="subject-ask-ai-button"
           >
-            <Sparkles size={14} aria-hidden="true" />
+            <Sparkles size={14} />
             Ask AI
           </button>
         </div>
@@ -333,10 +388,7 @@ export default function LibraryPage() {
   const { data: savedSubjects = [] }                          = useSavedSubjects(token, user);
   const toggleSaved = useToggleSavedSubject(token);
 
-  // ── Handle URL parameters for deep linking (REMOVED - causing issues) ───────
-  // Removed to prevent "Cannot access 'subjects' before initialization" error
-  
-  // ── Auto-select stream from onboarding ───────────────────────────────────
+  // ── Auto-select stream from onboarding ───────────────────────────────
   useEffect(() => {
     if (!streams.length) return;
     const profile = getOnboardingProfile();
@@ -357,7 +409,6 @@ export default function LibraryPage() {
     window.addEventListener('content-uploaded', handleContentUploaded);
     return () => window.removeEventListener('content-uploaded', handleContentUploaded);
   }, [refetchSubjects]);
-
 
   // ── Data enrichment pipeline (memoized for O(1) lookup) ──────────────────
   const streamMap = useMemo(() => new Map(streams.map(s => [s.id, s])), [streams]);
@@ -531,10 +582,13 @@ export default function LibraryPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Search subjects"
               placeholder="Search subjects, topics..."
-              className="w-full h-11 pl-10 pr-4 rounded-lg text-sm text-foreground outline-none border focus:border-primary"
+              className="w-full h-11 pl-10 pr-4 rounded-xl text-sm text-foreground outline-none transition-all focus:ring-2 focus:ring-primary/20"
               style={{
-                background: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border) / 0.15)',
+                background: 'var(--card)',
+                backdropFilter: 'blur(20px)',
+                WebkitBackdropFilter: 'blur(20px)',
+                border: '1px solid rgba(139,92,246,0.15)',
+                color: 'hsl(var(--foreground))',
               }}
               data-testid="library-search-input"
             />
@@ -640,7 +694,6 @@ export default function LibraryPage() {
           )}
         </div>
       </div>
-
     </AppLayout>
   );
 }

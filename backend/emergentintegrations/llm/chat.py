@@ -36,6 +36,25 @@ class LlmChat:
         else:
             return await self._call_groq(messages)
 
+    async def send_messages(self, messages: list) -> str:
+        if self._provider == "openai":
+            return await self._call_openai(messages)
+        elif self._provider == "fireworksai":
+            return await self._call_fireworks(messages)
+        else:
+            return await self._call_groq(messages)
+
+    async def stream_messages(self, messages: list, max_tokens: int = 1024):
+        if self._provider == "openai":
+            async for token in self._stream_openai(messages, max_tokens):
+                yield token
+        elif self._provider == "fireworksai":
+            async for token in self._stream_fireworks(messages, max_tokens):
+                yield token
+        else:
+            async for token in self._stream_groq(messages, max_tokens):
+                yield token
+
     async def _call_groq(self, messages: list) -> str:
         from groq import AsyncGroq
         client = AsyncGroq(api_key=self.api_key)
@@ -44,6 +63,20 @@ class LlmChat:
             messages=messages,
         )
         return response.choices[0].message.content or ""
+
+    async def _stream_groq(self, messages: list, max_tokens: int = 1024):
+        from groq import AsyncGroq
+        client = AsyncGroq(api_key=self.api_key)
+        stream = await client.chat.completions.create(
+            model=self._model,
+            messages=messages,
+            max_tokens=max_tokens,
+            stream=True,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
 
     async def _call_openai(self, messages: list) -> str:
         import openai
@@ -54,8 +87,21 @@ class LlmChat:
         )
         return response.choices[0].message.content or ""
 
+    async def _stream_openai(self, messages: list, max_tokens: int = 1024):
+        import openai
+        client = openai.AsyncOpenAI(api_key=self.api_key)
+        stream = await client.chat.completions.create(
+            model=self._model,
+            messages=messages,
+            max_tokens=max_tokens,
+            stream=True,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content
+
     async def _call_fireworks(self, messages: list) -> str:
-        """Call Fireworks AI using OpenAI-compatible client"""
         import openai
         client = openai.AsyncOpenAI(
             api_key=self.api_key,
@@ -66,3 +112,20 @@ class LlmChat:
             messages=messages,
         )
         return response.choices[0].message.content or ""
+
+    async def _stream_fireworks(self, messages: list, max_tokens: int = 1024):
+        import openai
+        client = openai.AsyncOpenAI(
+            api_key=self.api_key,
+            base_url="https://api.fireworks.ai/inference/v1"
+        )
+        stream = await client.chat.completions.create(
+            model=self._model,
+            messages=messages,
+            max_tokens=max_tokens,
+            stream=True,
+        )
+        async for chunk in stream:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
+                yield delta.content

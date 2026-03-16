@@ -56,12 +56,13 @@ Syrabit.ai is an AI-powered exam prep platform for AHSEC (Class 11-12) and Degre
 - Frontend stores token in `localStorage` (`syrabit:token`) and sends as `Authorization: Bearer` header
 - Backend also sets `httponly` cookie (`syrabit_session`) as fallback for browsers that support it
 - Cookie security: controlled by `SECURE_COOKIES` env var (`false` in dev = `SameSite=lax` no Secure flag; `true` in prod = `SameSite=none; Secure`)
-- Admin token stored separately in `localStorage` (`syrabit:admin_token`)
+- Admin token stored separately in `sessionStorage` (`syrabit:admin_token`) — cleared on tab close for GDPR compliance
 
 ## Feature Status (all working)
 - Auth: signup, login, logout — dual Bearer token (localStorage) + cookie, works on both HTTP dev and HTTPS prod
 - Library: 50 AHSEC subjects across boards/classes/streams, chapter browser
-- AI Chat: fully functional via Groq (llama-3.3-70b-versatile), with RAG, web search fallback, credit deduction
+- AI Chat: fully functional via Groq (GPT-OSS-20B), native token-by-token streaming, `<think>` tag filtering (cross-chunk safe), 6-message conversation history window, with RAG, web search fallback, credit deduction
+- Frontend: MessageBubble memoized with React.memo, auto-scroll debounced via requestAnimationFrame for streaming performance
 - Credit system: 30 credits on signup, 1 per chat message
 - Admin panel: `/admin/login` — manage users, content, analytics
 - History: saved conversations per user

@@ -2082,30 +2082,63 @@ async def call_llm_api(messages: list, model: str = None, max_tokens: int = 1024
 
 async def call_llm_api_stream(messages: list, model: str = None, max_tokens: int = 1024):
     """
-    AI streaming via emergentintegrations - simulates SSE word-by-word for smooth UX.
-    Faster streaming for better chat speed (3-word chunks, 20ms delay).
+    Real token-by-token streaming from the LLM provider.
+    Uses native streaming APIs for instant first-token delivery.
     """
     api_key = OPENAI_API_KEY
     if not api_key:
         yield f"data: {json.dumps({'error': 'LLM API key not configured'})}\n\n"
         return
 
+    use_model = model or LLM_MODEL
+    provider, key = _resolve_provider_for_model(use_model)
+
     try:
-        # Get complete response from LLM
-        answer = await call_llm_api(messages, model, max_tokens)
-        
-        # Stream word-by-word for smooth UX (3-word chunks for faster delivery)
-        words = answer.split(' ')
-        chunk_size = 3  # 3 words at a time = faster streaming
-        
-        for i in range(0, len(words), chunk_size):
-            chunk = ' '.join(words[i:i+chunk_size])
-            if i + chunk_size < len(words):
-                chunk += ' '  # Add space between chunks
-            
-            yield f"data: {json.dumps({'content': chunk})}\n\n"
-            await asyncio.sleep(0.02)  # 20ms delay = 50 chunks/second (very smooth)
-        
+        chat = LlmChat(
+            api_key=key or api_key,
+            session_id=str(uuid.uuid4()),
+        ).with_model(provider, use_model)
+
+        logger.info(f"LLM stream: provider={provider}, model={use_model}")
+        in_think = False
+        buf = ""
+        async for token in chat.stream_messages(messages, max_tokens=max_tokens):
+            buf += token
+            while buf:
+                if in_think:
+                    close_idx = buf.find('</think>')
+                    if close_idx != -1:
+                        buf = buf[close_idx + 8:]
+                        in_think = False
+                    else:
+                        buf = ""
+                        break
+                else:
+                    open_idx = buf.find('<think>')
+                    if open_idx != -1:
+                        before = buf[:open_idx]
+                        if before:
+                            yield f"data: {json.dumps({'content': before})}\n\n"
+                        buf = buf[open_idx + 7:]
+                        in_think = True
+                    elif '<' in buf and buf.rstrip().endswith('<') or buf.endswith('<t') or buf.endswith('<th') or buf.endswith('<thi') or buf.endswith('<thin') or buf.endswith('<think'):
+                        partial_start = buf.rfind('<')
+                        candidate = buf[partial_start:]
+                        if '<think>'[:len(candidate)] == candidate:
+                            before = buf[:partial_start]
+                            if before:
+                                yield f"data: {json.dumps({'content': before})}\n\n"
+                            buf = candidate
+                            break
+                        else:
+                            yield f"data: {json.dumps({'content': buf})}\n\n"
+                            buf = ""
+                    else:
+                        yield f"data: {json.dumps({'content': buf})}\n\n"
+                        buf = ""
+        if buf and not in_think:
+            yield f"data: {json.dumps({'content': buf})}\n\n"
+
     except HTTPException as http_err:
         yield f"data: {json.dumps({'error': str(http_err.detail)})}\n\n"
     except Exception as e:
@@ -2802,7 +2835,7 @@ async def chat(msg: ChatMessage, user: dict = Depends(rate_limit_chat)):
     if conv_id:
         conv = await supa_get_conversation(conv_id, user["id"])
         if conv:
-            for m in conv.get("messages", [])[-10:]:
+            for m in conv.get("messages", [])[-6:]:
                 history_messages.append({"role": m["role"], "content": m["content"]})
     else:
         conv_id = str(uuid.uuid4())
@@ -2934,7 +2967,7 @@ async def chat_stream(msg: ChatMessage, user: dict = Depends(rate_limit_chat)):
     if conv_id:
         conv = await supa_get_conversation(conv_id, user["id"])
         if conv:
-            for m in conv.get("messages", [])[-10:]:
+            for m in conv.get("messages", [])[-6:]:
                 history_messages.append({"role": m["role"], "content": m["content"]})
     else:
         conv_id = str(uuid.uuid4())

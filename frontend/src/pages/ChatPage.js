@@ -4,7 +4,7 @@
  * actions bar (copy / regenerate / timestamp / credit badge),
  * credit progress bar, sync indicator, RAG source badge.
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -74,7 +74,7 @@ function RagBadge({ source, chunks }) {
 }
 
 // ── Message bubble ────────────────────────────────────────────────────────────
-function MessageBubble({ msg, onCopy, onRegenerate, isLast }) {
+const MessageBubble = memo(function MessageBubble({ msg, onCopy, onRegenerate, isLast }) {
   const [copied, setCopied] = useState(false);
   const isUser = msg.role === 'user';
 
@@ -211,7 +211,7 @@ function MessageBubble({ msg, onCopy, onRegenerate, isLast }) {
         </div>
     </motion.div>
   );
-}
+});
 
 // ── ChatPage ──────────────────────────────────────────────────────────────────
 export default function ChatPage() {
@@ -240,9 +240,14 @@ export default function ChatPage() {
   const textareaRef       = useRef(null);
   const abortControllerRef = useRef(null);
 
-  // ── Auto-scroll ────────────────────────────────────────────────────────────
+  // ── Auto-scroll (debounced for streaming perf) ─────────────────────────────
+  const scrollRaf = useRef(null);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (scrollRaf.current) cancelAnimationFrame(scrollRaf.current);
+    scrollRaf.current = requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
+    return () => { if (scrollRaf.current) cancelAnimationFrame(scrollRaf.current); };
   }, [messages]);
 
   // ── Load subject context ───────────────────────────────────────────────────

@@ -44,7 +44,7 @@ class LlmChat:
         else:
             return await self._call_groq(messages)
 
-    async def stream_messages(self, messages: list, max_tokens: int = 1024):
+    async def stream_messages(self, messages: list, max_tokens: int = 2048):
         if self._provider == "openai":
             async for token in self._stream_openai(messages, max_tokens):
                 yield token
@@ -61,10 +61,11 @@ class LlmChat:
         response = await client.chat.completions.create(
             model=self._model,
             messages=messages,
+            max_tokens=2048,
         )
         return response.choices[0].message.content or ""
 
-    async def _stream_groq(self, messages: list, max_tokens: int = 1024):
+    async def _stream_groq(self, messages: list, max_tokens: int = 2048):
         from groq import AsyncGroq
         client = AsyncGroq(api_key=self.api_key)
         stream = await client.chat.completions.create(
@@ -72,6 +73,8 @@ class LlmChat:
             messages=messages,
             max_tokens=max_tokens,
             stream=True,
+            temperature=0.7,
+            top_p=0.9,
         )
         async for chunk in stream:
             delta = chunk.choices[0].delta if chunk.choices else None

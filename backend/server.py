@@ -2075,12 +2075,12 @@ async def _call_llm_raw(messages: list, model: str = None, max_tokens: int = 102
     logger.error(f"All LLM providers exhausted. Last error: {last_err}")
     raise HTTPException(status_code=503, detail="AI service temporarily unavailable. Please try again.")
 
-async def call_llm_api(messages: list, model: str = None, max_tokens: int = 1024) -> str:
+async def call_llm_api(messages: list, model: str = None, max_tokens: int = 2048) -> str:
     """Smart-batched LLM call: deduplicates identical requests, limits concurrency."""
     return await _llm_batcher.call(messages, model, max_tokens)
 
 
-async def call_llm_api_stream(messages: list, model: str = None, max_tokens: int = 1024):
+async def call_llm_api_stream(messages: list, model: str = None, max_tokens: int = 2048):
     """
     Real token-by-token streaming from the LLM provider.
     Uses native streaming APIs for instant first-token delivery.

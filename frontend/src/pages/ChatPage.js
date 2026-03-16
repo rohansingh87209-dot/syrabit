@@ -240,14 +240,14 @@ export default function ChatPage() {
   const textareaRef       = useRef(null);
   const abortControllerRef = useRef(null);
 
-  // ── Auto-scroll (debounced for streaming perf) ─────────────────────────────
-  const scrollRaf = useRef(null);
+  // ── Auto-scroll (high-frequency for max streaming speed) ──────────────────
+  const scrollTimeoutRef = useRef(null);
   useEffect(() => {
-    if (scrollRaf.current) cancelAnimationFrame(scrollRaf.current);
-    scrollRaf.current = requestAnimationFrame(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    });
-    return () => { if (scrollRaf.current) cancelAnimationFrame(scrollRaf.current); };
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+    scrollTimeoutRef.current = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+    }, 0);
+    return () => { if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current); };
   }, [messages]);
 
   // ── Load subject context ───────────────────────────────────────────────────

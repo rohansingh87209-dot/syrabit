@@ -64,7 +64,8 @@ Syrabit.ai is an AI-powered exam prep platform for AHSEC (Class 11-12) and Degre
 - AI Chat: fully functional via Groq (GPT-OSS-20B), native token-by-token streaming at max throughput (~240 tokens/sec), `<think>` tag filtering (cross-chunk safe), 6-message conversation history window, max_tokens=2048, with RAG, web search fallback, credit deduction
 - Frontend: MessageBubble memoized with React.memo, smooth auto-scroll with `behavior: 'smooth'`
 - Library page: Optimized with memoized enrichment (O(1) lookups via Maps), memoized filtering, SubjectCard memoized, **all PDF features removed for instant load**
-- UI/UX Design: **Professional startup aesthetic.** Animated mesh backgrounds (30s cycle, subtle radial gradients at 20%/80%), grid overlay (70px pattern, 0.08 opacity), glassmorphism (10px blur + 1.2x saturate), glow borders (fade in on hover), 3D card lift (translateY -4px). Removed over-engineering: heavy 20px blur, rotateX 3D tilt, excessive gradients. All pages smooth with clean transitions (0.2-0.3s ease). AppLayout properly renders background elements (mesh-bg, grid-overlay) for all pages.
+- UI/UX Design: **Professional startup aesthetic.** Animated mesh backgrounds (30s cycle, subtle radial gradients), grid overlay (70px pattern, 0.08 opacity), glassmorphism (10px blur + 1.2x saturate), glow borders (fade in on hover), 3D card lift (translateY -4px). All pages smooth with clean transitions (0.2-0.3s ease). AppLayout properly renders background elements for all pages.
+- Cleanup: Removed 2 dead components (DocumentViewerModal, PdfViewer). Kept necessary dependencies (react-pdf used by AdminContentEditor for PDF upload). Build optimized with tree-shaking enabled. All production pages verified functional.
 - Credit system: 30 credits on signup, 1 per chat message
 - Admin panel: `/admin/login` — manage users, content, analytics
 - History: saved conversations per user

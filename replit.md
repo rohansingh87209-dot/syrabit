@@ -64,7 +64,7 @@ Syrabit.ai is an AI-powered exam prep platform for AHSEC (Class 11-12) and Degre
 - AI Chat: fully functional via Groq (GPT-OSS-20B), native token-by-token streaming at max throughput (~240 tokens/sec), `<think>` tag filtering (cross-chunk safe), 6-message conversation history window, max_tokens=2048, with RAG, web search fallback, credit deduction
 - Frontend: MessageBubble memoized with React.memo, smooth auto-scroll with `behavior: 'smooth'`
 - Library page: Optimized with memoized enrichment (O(1) lookups via Maps), memoized filtering, SubjectCard memoized, **all PDF features removed for instant load**
-- UI/UX Design: Clean, minimal developer-built interface (no trendy glassmorphism/blur effects). Solid colors, purposeful animations only. Buttons: solid purple primary (#7c3aed), neutral secondary, clean borders. Cards: minimal shadow, no gradients. Inputs: simple borders with focus states. All transitions 0.15s ease for snappy feedback.
+- UI/UX Design: **Developer-built balance.** Removed: animated mesh backgrounds, grid overlays, heavy glassmorphism (20px blur), glow borders, 3D tilt effects. Kept: smooth 0.2s transitions, subtle shadows (depth), button hover effect (translateY -1px), scale on click (0.98), focus ring on inputs (2px ring), subtle gradient on primary button (not flashy), rounded cards. This is what a real dev would ship.
 - Credit system: 30 credits on signup, 1 per chat message
 - Admin panel: `/admin/login` — manage users, content, analytics
 - History: saved conversations per user

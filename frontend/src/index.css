@@ -414,27 +414,32 @@
     border: 1px solid hsl(var(--border) / 0.2);
   }
 
-  /* ── SIMPLE CARD WITH SUBTLE SHADOW ── */
+  /* ── CARD WITH SUBTLE HOVER EFFECT ── */
   .card-3d {
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
   .card-3d:hover {
-    border-color: hsl(var(--border) / 0.4);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: hsl(var(--border) / 0.35);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
   }
 
-  /* ── CLEAN BUTTON STYLES ── */
+  /* ── BUTTON STYLES (developer-built, not trendy) ── */
   .btn-smooth {
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    transition: all 0.2s ease;
     outline: none;
     cursor: pointer;
+    border: none;
+  }
+  .btn-smooth:hover {
+    transform: translateY(-1px);
   }
   .btn-smooth:active {
-    opacity: 0.8;
+    transform: scale(0.98);
   }
   .btn-smooth:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+    transform: none;
   }
 
   /* ── BUTTON GROUP ALIGNMENT ── */
@@ -452,15 +457,15 @@
     min-width: 100px;
   }
 
-  /* ── PRIMARY BUTTON (solid, no gradient) ── */
+  /* ── PRIMARY BUTTON (subtle gradient for depth, not flashy) ── */
   .btn-primary {
-    background: #7c3aed;
+    background: linear-gradient(135deg, #7c3aed, #8b5cf6);
     color: white;
     font-weight: 600;
-    border: none;
+    box-shadow: 0 2px 8px rgba(124, 58, 237, 0.2);
   }
   .btn-primary:hover {
-    background: #6d28d9;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
   }
 
   /* ── SECONDARY BUTTON ── */
@@ -470,26 +475,29 @@
     border: 1px solid hsl(var(--border) / 0.3);
   }
   .btn-secondary:hover {
-    background: hsl(var(--border) / 0.05);
+    background: hsl(var(--border) / 0.08);
     border-color: hsl(var(--border) / 0.5);
+    color: hsl(var(--foreground));
   }
 
   /* ── TERTIARY (SAVED) BUTTON ── */
   .btn-tertiary {
-    background: #f3f4f6;
-    color: #7c3aed;
-    border: 1px solid hsl(var(--border) / 0.3);
+    background: rgba(124, 58, 237, 0.08);
+    color: hsl(var(--primary));
+    border: 1px solid rgba(124, 58, 237, 0.2);
   }
   .btn-tertiary:hover {
-    background: #e5e7eb;
+    background: rgba(124, 58, 237, 0.12);
+    border-color: rgba(124, 58, 237, 0.3);
   }
 
-  /* ── INPUT CLEAN TRANSITIONS ── */
+  /* ── INPUT FOCUS STATES (clean, not flashy) ── */
   input, textarea, select {
-    transition: border-color 0.15s ease, background-color 0.15s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
   input:focus, textarea:focus, select:focus {
     border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
   }
 
   /* ── SIDEBAR NAV ACTIVE INDICATOR ── */

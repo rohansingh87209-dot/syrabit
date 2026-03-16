@@ -117,20 +117,52 @@ function LibrarySkeleton() {
   );
 }
 
-// ── Subject Card ──────────────────────────────────────────────────────────────
+// ── Filter Chip (memoized) ────────────────────────────────────────────────────
+const FilterChip = memo(function FilterChip({ chip, isActive, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={isActive}
+      className="flex-shrink-0 px-4 py-1.5 rounded-full text-sm transition-all duration-200 active:scale-95"
+      style={
+        isActive
+          ? {
+              color: '#fff',
+              fontWeight: 600,
+              background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
+              boxShadow: '0 4px 16px var(--glow-primary, rgba(139,92,246,0.35))',
+            }
+          : {
+              color: 'hsl(var(--muted-foreground))',
+              fontWeight: 400,
+              background: 'var(--card)',
+              border: '1px solid rgba(139,92,246,0.12)',
+            }
+      }
+      data-testid="library-filter-chip"
+    >
+      {chip.label}
+    </button>
+  );
+});
+
+// ── Subject Card (memoized with deep optimization) ────────────────────────────
 const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOpen, onAskAI, onSeoNav, index }) {
-  const thumbColors = THUMB_GRADIENTS[sub.gradient] || THUMB_GRADIENTS.math;
-  const hasThumbnail = !!sub.thumbnailUrl;
-  const tags = Array.isArray(sub.tags) ? sub.tags : [];
-  const visibleTags = tags.slice(0, 4);
-  const overflowCount = tags.length - 4;
-  const chapterCount = sub.chapter_count || sub.chapterCount || 0;
-  const totalTokens = sub.total_tokens || sub.totalTokens || 0;
-  const totalChats = sub.total_chats || sub.totalChats || 0;
-  const hasDocument = sub.has_document === true;
-  const seoPath = sub.boardSlug && sub.classSlug && sub.streamSlug && sub.slug
-    ? `/${sub.boardSlug}/${sub.classSlug}/${sub.streamSlug}/${sub.slug}`
-    : null;
+  const thumbColors = useMemo(() => THUMB_GRADIENTS[sub.gradient] || THUMB_GRADIENTS.math, [sub.gradient]);
+  const hasThumbnail = useMemo(() => !!sub.thumbnailUrl, [sub.thumbnailUrl]);
+  const tags = useMemo(() => Array.isArray(sub.tags) ? sub.tags : [], [sub.tags]);
+  const visibleTags = useMemo(() => tags.slice(0, 4), [tags]);
+  const overflowCount = useMemo(() => tags.length - 4, [tags.length]);
+  const chapterCount = useMemo(() => sub.chapter_count || sub.chapterCount || 0, [sub.chapter_count, sub.chapterCount]);
+  const totalTokens = useMemo(() => sub.total_tokens || sub.totalTokens || 0, [sub.total_tokens, sub.totalTokens]);
+  const totalChats = useMemo(() => sub.total_chats || sub.totalChats || 0, [sub.total_chats, sub.totalChats]);
+  const hasDocument = useMemo(() => sub.has_document === true, [sub.has_document]);
+  const seoPath = useMemo(() => 
+    sub.boardSlug && sub.classSlug && sub.streamSlug && sub.slug
+      ? `/${sub.boardSlug}/${sub.classSlug}/${sub.streamSlug}/${sub.slug}`
+      : null,
+    [sub.boardSlug, sub.classSlug, sub.streamSlug, sub.slug]
+  );
 
   return (
     <div
@@ -166,6 +198,8 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
             src={sub.thumbnailUrl}
             alt={`${sub.name} — AHSEC ${sub.className} ${sub.streamName} | Syrabit`}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           /* Gradient fallback thumbnail */
@@ -507,6 +541,23 @@ export default function LibraryPage() {
     setActiveFilter('all');
   }, []);
 
+  const handleRefetchSubjects = useCallback(() => {
+    refetchSubjects();
+    toast.success('Library updated!');
+  }, [refetchSubjects]);
+
+  const handleSearchChange = useCallback((e) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  const handleFilterChange = useCallback((filterId) => {
+    setActiveFilter(filterId);
+  }, []);
+
+  const handleSearchClear = useCallback(() => {
+    setSearchQuery('');
+  }, []);
+
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (subjectsLoading) {
     return (
@@ -547,10 +598,7 @@ export default function LibraryPage() {
             {/* Update Library Button */}
             <div className="flex gap-2">
               <button
-                onClick={() => {
-                  refetchSubjects();
-                  toast.success('Library updated!');
-                }}
+                onClick={handleRefetchSubjects}
                 className="h-10 px-4 rounded-xl text-sm font-medium text-white bg-violet-600 hover:bg-violet-500 transition-all flex items-center gap-2"
               >
                 <Layers size={14} />
@@ -575,11 +623,12 @@ export default function LibraryPage() {
           <div className="relative group/search">
             <Search
               className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none transition-colors text-muted-foreground group-focus-within/search:text-primary"
+              aria-hidden="true"
             />
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={handleSearchChange}
               aria-label="Search subjects"
               placeholder="Search subjects, topics..."
               className="w-full h-11 pl-10 pr-4 rounded-xl text-sm text-foreground outline-none transition-all focus:ring-2 focus:ring-primary/20"
@@ -594,7 +643,7 @@ export default function LibraryPage() {
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={handleSearchClear}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground text-xs px-1.5 py-0.5 rounded transition-colors"
                 aria-label="Clear search"
                 data-testid="library-search-clear"
@@ -611,35 +660,14 @@ export default function LibraryPage() {
             className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar"
             data-testid="library-filter-chips"
           >
-            {FILTER_CHIPS.map((chip) => {
-              const isActive = chip.id === activeFilter;
-              return (
-                <button
-                  key={chip.id}
-                  onClick={() => setActiveFilter(chip.id)}
-                  aria-pressed={isActive}
-                  className="flex-shrink-0 px-4 py-1.5 rounded-full text-sm transition-all duration-200 active:scale-95"
-                  style={
-                    isActive
-                      ? {
-                          color: '#fff',
-                          fontWeight: 600,
-                          background: 'linear-gradient(135deg, #7c3aed, #8b5cf6)',
-                          boxShadow: '0 4px 16px var(--glow-primary, rgba(139,92,246,0.35))',
-                        }
-                      : {
-                          color: 'hsl(var(--muted-foreground))',
-                          fontWeight: 400,
-                          background: 'var(--card)',
-                          border: '1px solid rgba(139,92,246,0.12)',
-                        }
-                  }
-                  data-testid="library-filter-chip"
-                >
-                  {chip.label}
-                </button>
-              );
-            })}
+            {FILTER_CHIPS.map((chip) => (
+              <FilterChip
+                key={chip.id}
+                chip={chip}
+                isActive={chip.id === activeFilter}
+                onClick={() => handleFilterChange(chip.id)}
+              />
+            ))}
           </div>
 
           {/* ── Subject grid or empty state ── */}

@@ -158,6 +158,10 @@ SUPABASE_URL         = os.environ.get('SUPABASE_URL', '')
 SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY', '') or os.environ.get('SUPABASE_KEY', '')
 SUPABASE_ANON_KEY    = os.environ.get('SUPABASE_ANON_KEY', '') or os.environ.get('SUPABASE_KEY', '')
 
+# ── Cookie security (set SECURE_COOKIES=false in dev to allow HTTP) ───────────
+SECURE_COOKIES  = os.environ.get('SECURE_COOKIES', 'true').lower() not in ('false', '0', 'no')
+COOKIE_SAMESITE = "none" if SECURE_COOKIES else "lax"
+
 _cors_raw = os.environ.get('CORS_ORIGINS', '*').strip().strip('"').strip("'")
 if _cors_raw == '*':
     CORS_ORIGINS = ["*"]
@@ -2432,8 +2436,8 @@ async def signup(data: UserCreate, response: Response):
         key="syrabit_session",
         value=token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=SECURE_COOKIES,
+        samesite=COOKIE_SAMESITE,
         max_age=JWT_EXPIRE_MINUTES * 60,
     )
     return TokenOut(access_token=token, user=user_out)
@@ -2463,8 +2467,8 @@ async def login(data: UserLogin, response: Response):
         key="syrabit_session",
         value=token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=SECURE_COOKIES,
+        samesite=COOKIE_SAMESITE,
         max_age=JWT_EXPIRE_MINUTES * 60,
     )
     return TokenOut(access_token=token, user=user_out)
@@ -3228,8 +3232,8 @@ async def admin_login(data: AdminLoginReq, response: Response):
         key="syrabit_admin_session",
         value=token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=SECURE_COOKIES,
+        samesite=COOKIE_SAMESITE,
         max_age=60 * 8 * 60,
     )
     return {
@@ -3241,12 +3245,12 @@ async def admin_login(data: AdminLoginReq, response: Response):
 
 @api.post("/auth/logout")
 async def logout(response: Response):
-    response.delete_cookie(key="syrabit_session", samesite="none", secure=True)
+    response.delete_cookie(key="syrabit_session", samesite=COOKIE_SAMESITE, secure=SECURE_COOKIES)
     return {"message": "Logged out"}
 
 @api.post("/admin/logout")
 async def admin_logout(response: Response):
-    response.delete_cookie(key="syrabit_admin_session", samesite="none", secure=True)
+    response.delete_cookie(key="syrabit_admin_session", samesite=COOKIE_SAMESITE, secure=SECURE_COOKIES)
     return {"message": "Logged out"}
 
 @api.get("/admin/verify")

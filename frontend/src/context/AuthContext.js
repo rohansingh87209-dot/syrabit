@@ -3,6 +3,18 @@ import axios from 'axios';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 const API = `${BACKEND_URL}/api`;
+const TOKEN_KEY = 'syrabit:token';
+
+const getStoredToken = () => {
+  try { return localStorage.getItem(TOKEN_KEY) || null; } catch { return null; }
+};
+const setStoredToken = (token) => {
+  try { token ? localStorage.setItem(TOKEN_KEY, token) : localStorage.removeItem(TOKEN_KEY); } catch {}
+};
+const buildAuthHeaders = () => {
+  const t = getStoredToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
 
 const AuthContext = createContext(null);
 
@@ -14,6 +26,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const res = await axios.get(`${API}/auth/me`, {
         withCredentials: true,
+        headers: buildAuthHeaders(),
       });
       setUser(res.data);
     } catch {
@@ -23,8 +36,6 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const init = async () => {
-      localStorage.removeItem('syrabit:token');
-      localStorage.removeItem('syrabit:user');
       await fetchMe();
       setLoading(false);
     };
@@ -33,7 +44,8 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const res = await axios.post(`${API}/auth/login`, { email, password }, { withCredentials: true });
-    const { user: userData } = res.data;
+    const { access_token, user: userData } = res.data;
+    setStoredToken(access_token);
     setUser(userData);
     try {
       const { Analytics } = await import('@/utils/analytics');
@@ -44,7 +56,8 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (name, email, password) => {
     const res = await axios.post(`${API}/auth/signup`, { name, email, password }, { withCredentials: true });
-    const { user: userData } = res.data;
+    const { access_token, user: userData } = res.data;
+    setStoredToken(access_token);
     setUser(userData);
     try {
       const { Analytics } = await import('@/utils/analytics');
@@ -55,8 +68,9 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true });
+      await axios.post(`${API}/auth/logout`, {}, { withCredentials: true, headers: buildAuthHeaders() });
     } catch {}
+    setStoredToken(null);
     localStorage.removeItem('syrabit:onboarding');
     setUser(null);
     try {
@@ -68,8 +82,20 @@ export const AuthProvider = ({ children }) => {
     await fetchMe();
   };
 
+  const token = getStoredToken();
+
   return (
-    <AuthContext.Provider value={{ user, token: null, loading, login, signup, logout, refreshUser, authHeader: {}, API }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      loading,
+      login,
+      signup,
+      logout,
+      refreshUser,
+      authHeader: token ? { Authorization: `Bearer ${token}` } : {},
+      API,
+    }}>
       {children}
     </AuthContext.Provider>
   );

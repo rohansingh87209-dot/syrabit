@@ -19,6 +19,7 @@ import { Toaster } from '@/components/ui/sonner';
 import '@/styles/perplexity-chat.css';
 
 const API_BASE = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
+const getToken = () => { try { return localStorage.getItem('syrabit:token') || null; } catch { return null; } };
 
 // ── Models (Groq) ─────────────────────────────────────────────────────────────
 const MODELS = [
@@ -343,9 +344,13 @@ export default function ChatPage() {
     };
 
     try {
+      const _token = getToken();
       const response = await fetch(`${API_BASE}/ai/chat/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(_token ? { Authorization: `Bearer ${_token}` } : {}),
+        },
         credentials: 'include',
         body: JSON.stringify(payload),
         signal: controller.signal,

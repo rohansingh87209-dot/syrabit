@@ -89,18 +89,21 @@ export default function AdminPage() {
 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminName,  setAdminName]  = useState('Admin');
-  const [adminToken, setAdminToken] = useState(null);
+  const [adminToken, setAdminToken] = useState(
+    () => { try { return localStorage.getItem('syrabit:admin_token') || null; } catch { return null; } }
+  );
 
   // ── Verify admin session ─────────────────────────────────────────────────
   useEffect(() => {
-    adminVerify()
+    const storedToken = adminToken;
+    adminVerify(storedToken)
       .then((res) => {
         if (res.data?.name) setAdminName(res.data.name);
         if (res.data?.email) setAdminEmail(res.data.email);
-        if (res.data?.token) setAdminToken(res.data.token);
         setVerifying(false);
       })
       .catch(() => {
+        localStorage.removeItem('syrabit:admin_token');
         navigate('/admin/login');
       });
   }, [navigate]);
@@ -138,6 +141,7 @@ export default function AdminPage() {
 
   const handleLogout = async () => {
     await adminLogout();
+    try { localStorage.removeItem('syrabit:admin_token'); } catch {}
     toast.success('Logged out');
     navigate('/admin/login');
   };

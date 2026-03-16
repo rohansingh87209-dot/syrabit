@@ -3,14 +3,24 @@ import axios from 'axios';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || '';
 export const API_BASE = `${BACKEND_URL}/api`;
 
-const authConfig = () => ({
-  withCredentials: true,
-});
+const getToken = () => {
+  try { return localStorage.getItem('syrabit:token') || null; } catch { return null; }
+};
+
+const authConfig = () => {
+  const token = getToken();
+  return {
+    withCredentials: true,
+    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+  };
+};
 
 export const apiClient = () => {
+  const token = getToken();
   const instance = axios.create({
     baseURL: API_BASE,
     withCredentials: true,
+    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
   });
   return instance;
 };

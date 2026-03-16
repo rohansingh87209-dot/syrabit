@@ -24,7 +24,7 @@ const getToken = () => { try { return localStorage.getItem('syrabit:token') || n
 // ── Models (Groq) ─────────────────────────────────────────────────────────────
 const MODELS = [
   { value: 'openai/gpt-oss-20b',      label: 'Syrabit SLM', badge: '⚡ Fast'  },
-  { value: 'openai/gpt-oss-120b',     label: 'Syrabit MLM', badge: '🧠 Smart'  },
+  { value: 'openai/gpt-oss-120b',     label: 'Syrabit MLM', badge: '🔜 Coming Soon', disabled: true },
 ];
 
 // ── Bubble animation variants ─────────────────────────────────────────────────

@@ -402,25 +402,97 @@
   /* ── No scrollbar ── */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* ── PROFESSIONAL ANIMATED MESH BACKGROUND ── */
+  @keyframes meshShift {
+    0%, 100% {
+      background-position: 0 0, 0 0;
+    }
+    25% {
+      background-position: 50px 30px, -30px 50px;
+    }
+    50% {
+      background-position: 100px 0, 0 100px;
+    }
+    75% {
+      background-position: 50px -30px, 30px 50px;
+    }
+  }
+
+  .mesh-bg {
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 600px 400px at 20% 20%, rgba(124, 58, 237, 0.08), transparent),
+      radial-gradient(ellipse 500px 350px at 80% 80%, rgba(99, 102, 241, 0.06), transparent),
+      radial-gradient(ellipse 400px 300px at 60% 30%, rgba(168, 85, 247, 0.05), transparent);
+    animation: meshShift 30s ease-in-out infinite;
+    pointer-events: none;
+    z-index: -2;
+  }
+
+  /* ── SUBTLE GRID OVERLAY ── */
+  .grid-overlay {
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(hsl(var(--border)) 0.5px, transparent 0.5px),
+      linear-gradient(90deg, hsl(var(--border)) 0.5px, transparent 0.5px);
+    background-size: 70px 70px;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.08;
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
    SECTION 4 — COMPONENT CSS CLASSES
    ══════════════════════════════════════════════════════════════ */
 @layer components {
-  /* ── CLEAN CARD STYLE ── */
+  /* ── PROFESSIONAL GLASSMORPHISM CARD ── */
   .glass-card {
-    background: hsl(var(--card));
-    border: 1px solid hsl(var(--border) / 0.2);
+    background: var(--card-glass);
+    backdrop-filter: blur(10px) saturate(1.2);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    border: 1px solid var(--card-glass-border);
   }
 
-  /* ── CARD WITH SUBTLE HOVER EFFECT ── */
+  /* ── SUBTLE GLOW BORDER (professional use case) ── */
+  .glow-border {
+    position: relative;
+  }
+  .glow-border::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(
+      135deg,
+      rgba(124, 58, 237, 0.15),
+      transparent 40%,
+      transparent 60%,
+      rgba(99, 102, 241, 0.10)
+    );
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .glow-border:hover::before {
+    opacity: 1;
+  }
+
+  /* ── 3D CARD HOVER EFFECT (subtle, professional) ── */
   .card-3d {
-    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    transform-style: preserve-3d;
+    perspective: 1000px;
   }
   .card-3d:hover {
+    transform: translateY(-4px);
     border-color: hsl(var(--border) / 0.35);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+    box-shadow:
+      0 12px 24px rgba(124, 58, 237, 0.12),
+      0 6px 12px rgba(0, 0, 0, 0.08);
   }
 
   /* ── BUTTON STYLES (developer-built, not trendy) ── */

@@ -136,9 +136,13 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
     <div
       className="w-full rounded-2xl overflow-hidden card-3d transition-all duration-300"
       style={{
-        background: 'hsl(var(--card))',
-        border: '1px solid hsl(var(--border) / 0.2)',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        background: 'var(--card-glass)',
+        backdropFilter: 'blur(10px) saturate(1.2)',
+        WebkitBackdropFilter: 'blur(10px) saturate(1.2)',
+        border: '1px solid var(--card-glass-border)',
+        boxShadow: isSaved
+          ? '0 8px 24px rgba(124, 58, 237, 0.08)'
+          : '0 2px 8px rgba(0, 0, 0, 0.04)',
       }}
       data-testid="library-subject-card"
       data-subject-id={sub.id}
@@ -531,10 +535,13 @@ export default function LibraryPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               aria-label="Search subjects"
               placeholder="Search subjects, topics..."
-              className="w-full h-11 pl-10 pr-4 rounded-lg text-sm text-foreground outline-none transition-all border focus:border-primary"
+              className="w-full h-11 pl-10 pr-4 rounded-lg text-sm text-foreground outline-none transition-all border focus:border-primary focus:ring-2 focus:ring-offset-0"
               style={{
-                background: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border) / 0.2)',
+                background: 'var(--input-bg)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                border: '1px solid var(--card-glass-border)',
+                focusRing: '2px solid rgba(124, 58, 237, 0.1)',
               }}
               data-testid="library-search-input"
             />

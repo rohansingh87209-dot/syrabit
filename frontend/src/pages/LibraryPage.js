@@ -586,34 +586,20 @@ export default function LibraryPage() {
             <div>
               <h1
                 className="text-foreground shimmer-text"
-                style={{ fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.2 }}
+                style={{ fontSize: '1.6rem', fontWeight: 700, lineHeight: 1.3 }}
               >
-                AHSEC &amp; DEGREE STUDY LIBRARY
+                AHSEC & DEGREE<br />
+                STUDY LIBRARY
               </h1>
             </div>
 
-            {/* Update Library Button */}
-            <div className="flex gap-2">
-              <button
-                onClick={handleRefetchSubjects}
-                className="h-10 px-4 rounded-xl text-sm font-medium text-white bg-violet-600 hover:bg-violet-500 transition-all flex items-center gap-2"
-              >
-                <Layers size={14} />
-                Update Library
-              </button>
-              
-              <button
-                className="w-10 h-10 rounded-full transition-all hover:scale-105 active:scale-95 overflow-hidden flex items-center justify-center"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(124,58,237,0.15), rgba(139,92,246,0.15))',
-                  border: '1px solid rgba(139,92,246,0.25)',
-                  boxShadow: '0 0 18px var(--glow-primary, rgba(139,92,246,0.2))',
-                }}
-                aria-label="Library"
-              >
-                <img src="/logo.png" alt="Syrabit.ai" className="w-7 h-7 rounded-lg object-cover" />
-              </button>
-            </div>
+            <button
+              onClick={handleRefetchSubjects}
+              className="h-10 px-4 rounded-xl text-sm font-medium text-white bg-violet-600 hover:bg-violet-500 transition-all flex items-center gap-2"
+            >
+              <Layers size={14} />
+              Update Library
+            </button>
           </div>
 
           {/* ── Search input ── */}

@@ -5182,7 +5182,7 @@ app.add_middleware(
 # ─────────────────────────────────────────────
 # SERVE REACT FRONTEND (SPA)
 # ─────────────────────────────────────────────
-FRONTEND_BUILD = ROOT_DIR.parent / "frontend" / "build"
+FRONTEND_BUILD = ROOT_DIR / "frontend" / "build"
 if FRONTEND_BUILD.is_dir():
     class CachedStaticFiles(StaticFiles):
         async def get_response(self, path, scope):

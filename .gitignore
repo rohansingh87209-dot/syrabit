@@ -89,3 +89,4 @@ Syrabitai/.git/lfs/objects/ac/f5/acf50e12957d7530a533a2d625180dc6d85614ebd1b3e35
 # Environment files
 *.env
 *.env.*
+mongodb/data/

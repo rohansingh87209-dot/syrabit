@@ -113,102 +113,103 @@ const MessageBubble = memo(function MessageBubble({ msg, onCopy, onRegenerate, i
       variants={bubbleVariants}
       initial="hidden"
       animate="visible"
-      className={`flex ${isUser ? 'justify-end' : 'justify-start'} group mb-1`}
+      className={`group ${isUser ? 'flex flex-col items-end mb-4' : 'mb-6'}`}
       data-testid="chat-message-bubble"
     >
       {isUser && (
-        <div className="flex justify-end w-full">
-          <div style={{
-            padding: '12px 16px',
-            background: '#7c3aed',
-            borderRadius: '18px 18px 4px 18px',
-            fontSize: '16px',
-            lineHeight: '1.5',
-            color: '#fff',
-            maxWidth: '85%',
-            wordWrap: 'break-word',
-          }}>
-            <p className="whitespace-pre-wrap">{msg.content}</p>
+        <>
+          <div
+            className="whitespace-pre-wrap"
+            style={{
+              padding: '10px 16px',
+              background: '#7c3aed',
+              borderRadius: '18px 18px 4px 18px',
+              fontSize: '15px',
+              lineHeight: '1.6',
+              color: '#fff',
+              maxWidth: '70%',
+              wordWrap: 'break-word',
+            }}
+          >
+            {msg.content}
           </div>
-        </div>
+          {!msg.streaming && (
+            <div className="flex items-center gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {timeStr && <span className="text-[11px] text-muted-foreground">{timeStr}</span>}
+              <button
+                onClick={handleCopy}
+                className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                title="Copy"
+              >
+                {copied ? <Check size={12} style={{ color: '#34d399' }} /> : <Copy size={12} />}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {!isUser && (
-        <div className="flex items-start gap-2 w-[96%]">
-          <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 mt-0.5">
-            <img src="/logo.png" alt="Syrabit.ai" className="w-full h-full object-cover" />
+        <div className="w-full">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0">
+              <img src="/logo.png" alt="Syrabit.ai" className="w-full h-full object-cover" />
+            </div>
+            <span className="text-xs font-semibold text-foreground/70">Syrabit AI</span>
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="w-full">
             {msg.streaming && !msg.content && (
-              <div className="flex items-center gap-3 py-4">
-                <Loader2 size={20} className="animate-spin text-violet-400" />
-                <span className="text-white/60 text-sm">AI is thinking...</span>
+              <div className="flex items-center gap-3 py-3">
+                <Loader2 size={18} className="animate-spin text-violet-400" />
+                <span className="text-muted-foreground text-sm">Thinking...</span>
               </div>
             )}
-            
+
             {msg.streaming && msg.content && (
-              <div className="text-white/90 leading-relaxed whitespace-pre-wrap p-3 bg-white/[0.03] rounded-xl">
+              <div className="text-foreground/90 leading-relaxed whitespace-pre-wrap text-[15px]">
                 {msg.content}
                 <motion.span
-                  className="inline-block w-px h-[1em] ml-0.5 rounded-full align-middle bg-violet-400"
+                  className="inline-block w-0.5 h-[1em] ml-0.5 rounded-full align-middle bg-violet-400"
                   animate={{ opacity: [1, 0, 1] }}
                   transition={{ duration: 0.65, repeat: Infinity }}
                 />
               </div>
             )}
-            
+
             {!msg.streaming && msg.content && (
-              <div className="text-white/90 leading-relaxed whitespace-pre-wrap p-3 bg-white/[0.03] rounded-xl border border-white/[0.06]">
+              <div className="text-foreground/90 leading-relaxed whitespace-pre-wrap text-[15px]">
                 {msg.content}
+              </div>
+            )}
+
+            {!msg.streaming && msg.content && (
+              <div className="flex items-center gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                {timeStr && (
+                  <span className="text-[11px] text-muted-foreground">{timeStr}</span>
+                )}
+                <RagBadge source={msg.rag_source} chunks={msg.rag_chunks} />
+                <button
+                  onClick={handleCopy}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                  title="Copy"
+                  aria-label={copied ? 'Copied' : 'Copy'}
+                >
+                  {copied ? <Check size={14} style={{ color: '#34d399' }} /> : <Copy size={14} />}
+                </button>
+                {isLast && onRegenerate && (
+                  <button
+                    onClick={onRegenerate}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                    title="Regenerate"
+                    aria-label="Regenerate"
+                  >
+                    <RefreshCw size={14} />
+                  </button>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
-
-      {/* Actions bar */}
-      <div
-        className={`flex items-center gap-1 transition-opacity ${
-          msg.streaming ? 'opacity-60' : 'opacity-0 group-hover:opacity-100'
-        } ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
-      >
-          {/* Timestamp */}
-          {timeStr && (
-            <span className="text-xs text-muted-foreground px-1">{timeStr}</span>
-          )}
-
-          {/* RAG badge (AI only, after streaming) */}
-          {!isUser && !msg.streaming && (
-            <RagBadge source={msg.rag_source} chunks={msg.rag_chunks} />
-          )}
-
-          {/* Copy button */}
-          {!msg.streaming && (
-            <button
-              onClick={handleCopy}
-              className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-              title="Copy response"
-              aria-label={copied ? 'Copied to clipboard' : 'Copy response'}
-            >
-              {copied
-                ? <Check size={12} style={{ color: '#34d399' }} aria-hidden="true" />
-                : <Copy size={12} aria-hidden="true" />
-              }
-            </button>
-          )}
-
-          {/* Regenerate (AI only, last message, not streaming) */}
-          {!isUser && !msg.streaming && isLast && onRegenerate && (
-            <button
-              onClick={onRegenerate}
-              className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
-              title="Regenerate response"
-              aria-label="Regenerate AI response"
-            >
-              <RefreshCw size={12} aria-hidden="true" />
-            </button>
-          )}
-        </div>
     </motion.div>
   );
 });
@@ -555,84 +556,75 @@ export default function ChatPage() {
           </div>
         )}
 
-        {/* ── Message area - Perplexity Pro Style ───────────────────────────── */}
-        <div className="flex-1 overflow-y-auto chat-viewport" 
-             style={{ 
-               height: '100vh', 
-               padding: '8px',
-               overflowY: 'auto',
-               scrollBehavior: 'smooth',
-               WebkitOverflowScrolling: 'touch'
-             }}
-             onClick={() => setShowModelMenu(false)}
-             role="log" aria-label="Chat messages" aria-live="polite">
-          <div className="h-full">
+        {/* ── Message area ── */}
+        <div
+          className="flex-1 overflow-y-auto min-h-0"
+          onClick={() => setShowModelMenu(false)}
+          role="log"
+          aria-label="Chat messages"
+          aria-live="polite"
+        >
+          <div className="max-w-3xl mx-auto px-4 md:px-6 py-4">
 
-            {/* Empty state — 5 animated elements */}
+            {/* Empty state */}
             {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full text-center space-y-6 min-h-[400px]">
-
-                {/* 1. Floating logo */}
+              <div className="flex flex-col items-center justify-center text-center space-y-5 py-8">
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ duration: 0.35 }}
                 >
                   <div
-                    className="w-20 h-20 rounded-3xl flex items-center justify-center"
+                    className="w-16 h-16 rounded-2xl flex items-center justify-center"
                     style={{
                       background: 'linear-gradient(135deg,rgba(124,58,237,0.20),rgba(139,92,246,0.15))',
                       border: '1px solid rgba(139,92,246,0.25)',
-                      animation: 'float 4s ease-in-out infinite',
                     }}
                   >
-                    <BookOpen size={48} className="text-violet-400" />
+                    <BookOpen size={36} className="text-violet-400" />
                   </div>
                 </motion.div>
 
-                {/* 2. Heading + description */}
                 <motion.div
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.35, delay: 0.08 }}
                 >
                   <h2
-                    className="text-foreground mb-2 shimmer-text"
-                    style={{ fontSize: '1.35rem', fontWeight: 700 }}
+                    className="text-foreground mb-1.5 shimmer-text"
+                    style={{ fontSize: '1.2rem', fontWeight: 700 }}
                   >
                     {subject ? `Ask me about ${subject.name}` : "Hi! I'm your AI Tutor"}
                   </h2>
-                  <p className="text-muted-foreground text-sm max-w-sm">
-                  {documentId
-                      ? 'I have the uploaded document loaded as primary source (Tier 0 RAG). Ask any question.'
+                  <p className="text-muted-foreground text-sm max-w-sm mx-auto">
+                    {documentId
+                      ? 'Document loaded as primary source. Ask any question.'
                       : subject
-                      ? `${scopedChapters.length} chapters loaded — I'll search the syllabus database before answering. If no relevant content is found, I'll search the web.`
-                      : 'Ask me anything about your subjects. I search the syllabus database first, then the web if needed.'
+                      ? `${scopedChapters.length} chapters loaded — syllabus-first answers.`
+                      : 'Ask anything — syllabus database first, web if needed.'
                     }
                   </p>
                 </motion.div>
 
-                {/* 3. "Browse Syllabus" button (when no subject) */}
                 {!subject && (
                   <motion.button
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: 0.14 }}
                     onClick={() => navigate('/library')}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 hover:opacity-90 active:scale-95"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 hover:opacity-90 active:scale-95"
                     style={{
                       background: 'linear-gradient(135deg,rgba(124,58,237,0.15),rgba(139,92,246,0.15))',
                       border: '1px solid rgba(139,92,246,0.25)',
                       color: 'hsl(var(--primary))',
                     }}
                   >
-                    <BookOpen size={16} />
-                    Ask about a Syllabus Subject →
+                    <BookOpen size={15} />
+                    Browse Syllabus →
                   </motion.button>
                 )}
 
-                {/* 4. Prompt suggestion cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full max-w-lg">
                   {defaultPrompts.map((prompt, i) => (
                     <motion.button
                       key={prompt}
@@ -640,26 +632,13 @@ export default function ChatPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.28, delay: 0.18 + i * 0.06 }}
                       onClick={() => { setInput(prompt); textareaRef.current?.focus(); }}
-                      className="p-3 rounded-2xl text-left text-sm text-muted-foreground hover:text-foreground transition-all duration-200 card-3d glass-card"
-                      style={{ border: '1px solid rgba(139,92,246,0.15)' }}
+                      className="p-3 rounded-xl text-left text-sm text-muted-foreground hover:text-foreground transition-all duration-200"
+                      style={{ border: '1px solid rgba(139,92,246,0.12)', background: 'rgba(124,58,237,0.03)' }}
                     >
                       {prompt}
                     </motion.button>
                   ))}
                 </div>
-
-                {/* 5. Connection status line */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.45 }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-muted-foreground border border-border"
-                >
-                  <span>
-                    {syncState === 'offline' && 'AI service check failed'}
-                    {syncState === 'syncing' && 'Connecting…'}
-                  </span>
-                </motion.div>
               </div>
             )}
 
@@ -679,27 +658,20 @@ export default function ChatPage() {
           </div>
         </div>
 
-        {/* ── Input area ────────────────────────────────────────────────── */}
-        <motion.div
-          className="flex-shrink-0 border-t border-border px-4 md:px-6 py-4"
+        {/* ── Input area — always visible at bottom ───────────────────── */}
+        <div
+          className="flex-shrink-0 border-t border-border/50 px-4 md:px-6 py-3"
           style={{ background: 'var(--card)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
           data-testid="chat-input"
         >
-          <div className="max-w-[96%] mx-auto">
-
-            {/* RAG context info (when subject set + no messages yet) */}
+          <div className="max-w-3xl mx-auto">
             {subject && messages.length === 0 && scopedChapters.length > 0 && (
-              <div className="flex items-center gap-2 mb-3 px-1 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 mb-2 px-1 text-xs text-muted-foreground">
                 <Database size={12} style={{ color: 'hsl(var(--primary) / 0.6)' }} />
-                <span>RAG context: {scopedChapters.length} chapters from {subject.name} loaded</span>
+                <span>RAG: {scopedChapters.length} chapters from {subject.name}</span>
               </div>
             )}
 
-
-            {/* Input container */}
             <div
               className="flex items-end gap-3 p-3 rounded-2xl border transition-all duration-200"
               style={
@@ -720,10 +692,10 @@ export default function ChatPage() {
                 }}
                 placeholder={
                   isOutOfCredits
-                    ? 'No credits remaining — upgrade your plan to continue'
+                    ? 'No credits remaining — upgrade to continue'
                     : subject
                     ? `Ask about ${subject.name}…`
-                    : 'Ask anything... (I\'ll search syllabus DB, then web if needed)'
+                    : 'Ask anything...'
                 }
                 disabled={isOutOfCredits}
                 rows={1}
@@ -747,14 +719,14 @@ export default function ChatPage() {
                       : { background: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }
                   }
                   data-testid="chat-send-button"
-                  aria-label={isLoading ? 'Sending message…' : 'Send message'}
+                  aria-label={isLoading ? 'Sending…' : 'Send message'}
                 >
                   {isLoading ? <Loader2 size={16} className="animate-spin" aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
                 </button>
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </div>
     </AppLayout>
   );

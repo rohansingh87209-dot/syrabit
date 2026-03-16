@@ -350,8 +350,8 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
           </Link>
         )}
 
-        {/* Action buttons — simplified (no PDF button) */}
-        <div className="flex gap-2 pt-1">
+        {/* Action buttons — 3 equal columns */}
+        <div className="grid grid-cols-3 gap-2 pt-1">
           {/* Save / Unsave */}
           <button
             onClick={() => onToggleSave(sub.id)}
@@ -372,11 +372,7 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
             onClick={() => onOpen(sub)}
             aria-label={`Open ${sub.name}`}
             className="flex items-center justify-center gap-1.5 h-10 rounded-xl text-sm font-medium transition-all duration-200 active:scale-95"
-            style={
-              hasDocument
-                ? { color: '#34d399', background: 'rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.25)' }
-                : { color: 'hsl(var(--muted-foreground))', background: 'transparent', border: '1px solid rgba(139,92,246,0.15)' }
-            }
+            style={{ color: 'hsl(var(--muted-foreground))', background: 'transparent', border: '1px solid rgba(139,92,246,0.15)' }}
             data-testid="subject-open-button"
           >
             Open

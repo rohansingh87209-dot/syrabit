@@ -3523,17 +3523,25 @@ async def track_event(
 # ─────────────────────────────────────────────
 @api.post("/admin/content/boards")
 async def admin_create_board(data: dict, admin: dict = Depends(get_admin_user)):
-    board_id = str(uuid.uuid4())[:8]
-    board = {
-        "id": board_id,
-        "name": data["name"],
-        "slug": data["name"].lower().replace(" ", "-"),
-        "description": data.get("description", ""),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.boards.insert_one(board)
-    _invalidate_content_cache("boards")
-    return {k: v for k, v in board.items() if k != "_id"}
+    try:
+        if not await is_mongo_available():
+            raise HTTPException(status_code=503, detail="MongoDB unavailable - cannot create content")
+        board_id = str(uuid.uuid4())[:8]
+        board = {
+            "id": board_id,
+            "name": data["name"],
+            "slug": data["name"].lower().replace(" ", "-"),
+            "description": data.get("description", ""),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.boards.insert_one(board)
+        _invalidate_content_cache("boards")
+        return {k: v for k, v in board.items() if k != "_id"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        mark_mongo_down()
+        raise HTTPException(status_code=503, detail="Database error")
 
 @api.patch("/admin/content/boards/{board_id}")
 async def admin_update_board(board_id: str, data: dict, admin: dict = Depends(get_admin_user)):
@@ -3553,18 +3561,26 @@ async def admin_delete_board(board_id: str, admin: dict = Depends(get_admin_user
 
 @api.post("/admin/content/classes")
 async def admin_create_class(data: dict, admin: dict = Depends(get_admin_user)):
-    class_id = str(uuid.uuid4())[:8]
-    cls = {
-        "id": class_id,
-        "board_id": data["board_id"],
-        "name": data["name"],
-        "slug": data["name"].lower().replace(" ", "-"),
-        "description": data.get("description", ""),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.classes.insert_one(cls)
-    _invalidate_content_cache("classes")
-    return {k: v for k, v in cls.items() if k != "_id"}
+    try:
+        if not await is_mongo_available():
+            raise HTTPException(status_code=503, detail="MongoDB unavailable - cannot create content")
+        class_id = str(uuid.uuid4())[:8]
+        cls = {
+            "id": class_id,
+            "board_id": data["board_id"],
+            "name": data["name"],
+            "slug": data["name"].lower().replace(" ", "-"),
+            "description": data.get("description", ""),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.classes.insert_one(cls)
+        _invalidate_content_cache("classes")
+        return {k: v for k, v in cls.items() if k != "_id"}
+    except HTTPException:
+        raise
+    except Exception:
+        mark_mongo_down()
+        raise HTTPException(status_code=503, detail="Database error")
 
 @api.patch("/admin/content/classes/{class_id}")
 async def admin_update_class(class_id: str, data: dict, admin: dict = Depends(get_admin_user)):
@@ -3584,19 +3600,27 @@ async def admin_delete_class(class_id: str, admin: dict = Depends(get_admin_user
 
 @api.post("/admin/content/streams")
 async def admin_create_stream(data: dict, admin: dict = Depends(get_admin_user)):
-    stream_id = str(uuid.uuid4())[:8]
-    stream = {
-        "id": stream_id,
-        "class_id": data["class_id"],
-        "name": data["name"],
-        "slug": data["name"].lower().replace(" ", "-"),
-        "description": data.get("description", ""),
-        "icon": data.get("icon", "📚"),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.streams.insert_one(stream)
-    _invalidate_content_cache("streams")
-    return {k: v for k, v in stream.items() if k != "_id"}
+    try:
+        if not await is_mongo_available():
+            raise HTTPException(status_code=503, detail="MongoDB unavailable - cannot create content")
+        stream_id = str(uuid.uuid4())[:8]
+        stream = {
+            "id": stream_id,
+            "class_id": data["class_id"],
+            "name": data["name"],
+            "slug": data["name"].lower().replace(" ", "-"),
+            "description": data.get("description", ""),
+            "icon": data.get("icon", "📚"),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.streams.insert_one(stream)
+        _invalidate_content_cache("streams")
+        return {k: v for k, v in stream.items() if k != "_id"}
+    except HTTPException:
+        raise
+    except Exception:
+        mark_mongo_down()
+        raise HTTPException(status_code=503, detail="Database error")
 
 @api.patch("/admin/content/streams/{stream_id}")
 async def admin_update_stream(stream_id: str, data: dict, admin: dict = Depends(get_admin_user)):
@@ -3619,50 +3643,58 @@ async def admin_delete_stream(stream_id: str, admin: dict = Depends(get_admin_us
 # ─────────────────────────────────────────────
 @api.post("/admin/content/subjects")
 async def admin_create_subject(data: SubjectCreate, admin: dict = Depends(get_admin_user)):
-    await ensure_seeded()
-    
-    stream_name_val = ""
-    board_id_val = ""
-    board_name_val = ""
-    class_name_val = ""
-    stream_id_val = data.stream_id or ""
+    try:
+        if not await is_mongo_available():
+            raise HTTPException(status_code=503, detail="MongoDB unavailable - cannot create content")
+        await ensure_seeded()
+        
+        stream_name_val = ""
+        board_id_val = ""
+        board_name_val = ""
+        class_name_val = ""
+        stream_id_val = data.stream_id or ""
 
-    if data.stream_id:
-        stream = await db.streams.find_one({"id": data.stream_id}, {"_id": 0})
-        if not stream:
-            raise HTTPException(status_code=404, detail="Stream not found")
-        stream_name_val = stream.get("name", "")
-        class_obj = await db.classes.find_one({"id": stream.get("class_id")}, {"_id": 0})
-        board = await db.boards.find_one({"id": class_obj.get("board_id") if class_obj else None}, {"_id": 0})
-        board_id_val = board.get("id", "") if board else ""
-        board_name_val = board.get("name", "") if board else ""
-        class_name_val = class_obj.get("name", "") if class_obj else ""
-    elif data.stream_name:
-        stream_name_val = data.stream_name.strip()
-    else:
-        raise HTTPException(status_code=400, detail="Stream selection or custom stream name is required")
-    
-    subject_id = str(uuid.uuid4())
-    subj = {
-        "id": subject_id,
-        "name": data.name,
-        "stream_id": stream_id_val,
-        "streamName": stream_name_val,
-        "boardId": board_id_val,
-        "boardName": board_name_val,
-        "className": class_name_val,
-        "description": data.description,
-        "tags": data.tags,
-        "thumbnailUrl": data.thumbnail_url,
-        "status": data.status,
-        "slug": data.name.lower().replace(" ", "-"),
-        "chapter_count": 0,
-        "gradient": "math",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    await db.subjects.insert_one(subj)
-    return {k: v for k, v in subj.items() if k != "_id"}
+        if data.stream_id:
+            stream = await db.streams.find_one({"id": data.stream_id}, {"_id": 0})
+            if not stream:
+                raise HTTPException(status_code=404, detail="Stream not found")
+            stream_name_val = stream.get("name", "")
+            class_obj = await db.classes.find_one({"id": stream.get("class_id")}, {"_id": 0})
+            board = await db.boards.find_one({"id": class_obj.get("board_id") if class_obj else None}, {"_id": 0})
+            board_id_val = board.get("id", "") if board else ""
+            board_name_val = board.get("name", "") if board else ""
+            class_name_val = class_obj.get("name", "") if class_obj else ""
+        elif data.stream_name:
+            stream_name_val = data.stream_name.strip()
+        else:
+            raise HTTPException(status_code=400, detail="Stream selection or custom stream name is required")
+        
+        subject_id = str(uuid.uuid4())
+        subj = {
+            "id": subject_id,
+            "name": data.name,
+            "stream_id": stream_id_val,
+            "streamName": stream_name_val,
+            "boardId": board_id_val,
+            "boardName": board_name_val,
+            "className": class_name_val,
+            "description": data.description,
+            "tags": data.tags,
+            "thumbnailUrl": data.thumbnail_url,
+            "status": data.status,
+            "slug": data.name.lower().replace(" ", "-"),
+            "chapter_count": 0,
+            "gradient": "math",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        await db.subjects.insert_one(subj)
+        return {k: v for k, v in subj.items() if k != "_id"}
+    except HTTPException:
+        raise
+    except Exception:
+        mark_mongo_down()
+        raise HTTPException(status_code=503, detail="Database error")
 
 @api.put("/admin/content/subjects/{subject_id}")
 async def admin_update_subject(subject_id: str, data: dict, admin: dict = Depends(get_admin_user)):
@@ -4287,15 +4319,23 @@ async def admin_delete_chapter(chapter_id: str, admin: dict = Depends(get_admin_
 
 @api.post("/admin/seed")
 async def admin_reseed(admin: dict = Depends(get_admin_user)):
-    global _seeded
-    _seeded = False
-    await db.boards.delete_many({})
-    await db.classes.delete_many({})
-    await db.streams.delete_many({})
-    await db.subjects.delete_many({})
-    await db.chapters.delete_many({})
-    await ensure_seeded()
-    return {"message": "Content reseeded successfully"}
+    try:
+        if not await is_mongo_available():
+            raise HTTPException(status_code=503, detail="MongoDB unavailable in production - seed data is pre-loaded")
+        global _seeded
+        _seeded = False
+        await db.boards.delete_many({})
+        await db.classes.delete_many({})
+        await db.streams.delete_many({})
+        await db.subjects.delete_many({})
+        await db.chapters.delete_many({})
+        await ensure_seeded()
+        return {"message": "Content reseeded successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        mark_mongo_down()
+        raise HTTPException(status_code=503, detail=f"MongoDB error: {str(e)[:50]}")
 
 # ─────────────────────────────────────────────
 # SETTINGS

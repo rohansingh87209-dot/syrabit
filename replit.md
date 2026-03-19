@@ -68,9 +68,10 @@ Syrabit.ai is an AI-powered exam prep platform for AHSEC (Class 11-12) and Degre
 - UI/UX Design: **Professional startup aesthetic.** Animated mesh backgrounds (30s cycle, subtle radial gradients), grid overlay (70px pattern, 0.08 opacity), glassmorphism (10px blur + 1.2x saturate), glow borders (fade in on hover), 3D card lift (translateY -4px). All pages smooth with clean transitions (0.2-0.3s ease). AppLayout properly renders background elements for all pages.
 - Cleanup: Removed 2 dead components (DocumentViewerModal, PdfViewer). Kept necessary dependencies (react-pdf used by AdminContentEditor for PDF upload). Build optimized with tree-shaking enabled. All production pages verified functional.
 - Credit system: 30 credits on signup, 1 per chat message
-- Admin panel: `/admin/login` — manage users, content, analytics
+- Admin panel: `/admin/login` — manage users, content, analytics (now resilient to MongoDB downtime in production)
 - History: saved conversations per user
 - Profile: credit balance, usage stats
+- **MongoDB Resilience (Fixed):** All content read endpoints (library-bundle, search, chunks, documents, etc.) gracefully return empty arrays when MongoDB unavailable. Admin write endpoints (seed, create board/class/stream/subject) return clear 503 errors instead of crashing. Fast-fail pattern with `is_mongo_available()` check + 60s cache cooldown prevents timeout hangs. `mark_mongo_down()` helper immediately invalidates cache on failures.
 
 ## Deployment
 - Build: compiles React frontend into `frontend/build`

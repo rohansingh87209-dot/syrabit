@@ -197,14 +197,14 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
           <img
             src={sub.thumbnailUrl}
             alt={`${sub.name} — AHSEC ${sub.className} ${sub.streamName} | Syrabit`}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-500"
             loading="lazy"
             decoding="async"
           />
         ) : (
           /* Gradient fallback thumbnail */
           <div
-            className="w-full h-full transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full transition-transform duration-500"
             style={{
               background: `linear-gradient(135deg, ${thumbColors[0]}, ${thumbColors[1]})`,
             }}

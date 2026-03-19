@@ -85,8 +85,8 @@ export default function AdminHealth({ adminToken }) {
   };
 
   const deps = health?.dependencies || {};
-  const allOk = Object.values(deps).every((d) => d.status === 'ok' || d.status === 'not_configured');
-  const hasError = Object.values(deps).some((d) => d.status === 'error');
+  const allOk = Object.values(deps).every((d) => d.status === 'ok' || d.status === 'not_configured' || d.status === 'unavailable');
+  const hasError = Object.values(deps).some((d) => d.status === 'error' || d.status === 'not_configured');
 
   const chartData = (metricsData?.history || []).map((s) => ({
     ...s,

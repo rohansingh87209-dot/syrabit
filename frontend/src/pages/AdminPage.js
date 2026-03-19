@@ -130,7 +130,7 @@ export default function AdminPage() {
           return;
         }
         const deps = healthData.dependencies || {};
-        const hasError = Object.values(deps).some((v) => v?.status === 'error' || v?.status === 'unavailable');
+        const hasError = Object.values(deps).some((v) => v?.status === 'error' || v?.status === 'not_configured');
         setSysStatus(hasError ? 'warn' : 'ok');
       } catch {
         setSysStatus('warn');

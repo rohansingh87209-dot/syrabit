@@ -42,7 +42,7 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-MONGO_URL    = os.environ['MONGO_URL']
+MONGO_URL    = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 DB_NAME      = os.environ.get('DB_NAME', 'test_database')
 JWT_SECRET   = os.environ.get('JWT_SECRET') or os.urandom(48).hex()  # Must be set in .env for production
 JWT_ALGORITHM    = 'HS256'
@@ -188,14 +188,36 @@ ADMIN_PASSWORD = ADMIN_ACCOUNTS[0]["password"] if ADMIN_ACCOUNTS else ""
 # ─────────────────────────────────────────────
 # SETUP — MongoDB (content) + Supabase (users/convos)
 # ─────────────────────────────────────────────
-# MongoDB with fast timeout for Render
+# MongoDB with fast timeout
 mongo_client = AsyncIOMotorClient(
     MONGO_URL,
-    serverSelectionTimeoutMS=5000,  # 5 second timeout (vs default 30s)
-    connectTimeoutMS=5000,
-    socketTimeoutMS=5000
+    serverSelectionTimeoutMS=2000,
+    connectTimeoutMS=2000,
+    socketTimeoutMS=2000
 )
 db = mongo_client[DB_NAME]
+
+_mongo_available = None
+_mongo_last_check = 0.0
+_MONGO_CHECK_COOLDOWN = 60
+
+async def is_mongo_available():
+    global _mongo_available, _mongo_last_check
+    now = _time_mod.time()
+    if _mongo_available is not None and (now - _mongo_last_check) < _MONGO_CHECK_COOLDOWN:
+        return _mongo_available
+    try:
+        await db.command("ping")
+        _mongo_available = True
+    except Exception:
+        _mongo_available = False
+    _mongo_last_check = now
+    return _mongo_available
+
+def mark_mongo_down():
+    global _mongo_available, _mongo_last_check
+    _mongo_available = False
+    _mongo_last_check = _time_mod.time()
 
 # Supabase client (sync, used for users/conversations)
 from supabase import create_client as _create_supa
@@ -830,6 +852,9 @@ async def ensure_seeded():
     if _seeded:
         return
     
+    if not await is_mongo_available():
+        return
+    
     try:
         existing = await db.boards.count_documents({})
         degree_exists = await db.boards.find_one({"id": "b2"})
@@ -840,7 +865,7 @@ async def ensure_seeded():
             return
     except Exception as e:
         logger.warning(f"Database not available for seeding: {e}")
-        return  # Don't crash, just skip seeding
+        return
     logger.info("Seeding content data...")
     from pymongo import ReplaceOne
     if SEED_DATA["boards"]:
@@ -1143,92 +1168,78 @@ async def track_library_event(
 
 async def get_library_analytics(days: int = 30):
     """Get library analytics summary"""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
-    start_iso = start_date.isoformat()
-    
-    # Most searched queries
-    search_pipeline = [
-        {"$match": {"event_type": "search", "timestamp": {"$gte": start_iso}}},
-        {"$group": {"_id": "$search_query", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
-        {"$limit": 10}
-    ]
-    top_searches = await db.analytics.aggregate(search_pipeline).to_list(10)
-    
-    # Most viewed subjects
-    subject_view_pipeline = [
-        {"$match": {"event_type": "subject_view", "timestamp": {"$gte": start_iso}, "subject_id": {"$ne": None}}},
-        {"$group": {"_id": "$subject_id", "view_count": {"$sum": 1}}},
-        {"$sort": {"view_count": -1}},
-        {"$limit": 10}
-    ]
-    top_subjects_raw = await db.analytics.aggregate(subject_view_pipeline).to_list(10)
-    
-    # Get subject details
-    if top_subjects_raw:
-        subject_ids = [item["_id"] for item in top_subjects_raw]
-        subjects = await db.subjects.find({"id": {"$in": subject_ids}}, {"_id": 0, "id": 1, "name": 1, "description": 1}).to_list(20)
-        subject_map = {s["id"]: s for s in subjects}
+    if not await is_mongo_available():
+        return {"period_days": days, "top_searches": [], "most_viewed_subjects": [], "most_ask_ai_subjects": [], "document_opens": 0, "events_by_type": {}}
+    try:
+        start_date = datetime.now(timezone.utc) - timedelta(days=days)
+        start_iso = start_date.isoformat()
         
-        top_subjects = []
-        for item in top_subjects_raw:
-            subj = subject_map.get(item["_id"])
-            if subj:
-                top_subjects.append({
-                    "subject_id": item["_id"],
-                    "name": subj["name"],
-                    "view_count": item["view_count"]
-                })
-    else:
-        top_subjects = []
-    
-    # Most "Ask AI" clicks
-    ask_ai_pipeline = [
-        {"$match": {"event_type": "ask_ai_click", "timestamp": {"$gte": start_iso}, "subject_id": {"$ne": None}}},
-        {"$group": {"_id": "$subject_id", "ask_count": {"$sum": 1}}},
-        {"$sort": {"ask_count": -1}},
-        {"$limit": 10}
-    ]
-    top_ask_ai_raw = await db.analytics.aggregate(ask_ai_pipeline).to_list(10)
-    
-    if top_ask_ai_raw:
-        ask_subject_ids = [item["_id"] for item in top_ask_ai_raw]
-        ask_subjects = await db.subjects.find({"id": {"$in": ask_subject_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(20)
-        ask_subject_map = {s["id"]: s["name"] for s in ask_subjects}
+        search_pipeline = [
+            {"$match": {"event_type": "search", "timestamp": {"$gte": start_iso}}},
+            {"$group": {"_id": "$search_query", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 10}
+        ]
+        top_searches = await db.analytics.aggregate(search_pipeline).to_list(10)
         
-        top_ask_ai = []
-        for item in top_ask_ai_raw:
-            name = ask_subject_map.get(item["_id"], "Unknown")
-            top_ask_ai.append({
-                "subject_id": item["_id"],
-                "name": name,
-                "ask_count": item["ask_count"]
-            })
-    else:
-        top_ask_ai = []
-    
-    # Document opens
-    doc_open_count = await db.analytics.count_documents({
-        "event_type": "document_open",
-        "timestamp": {"$gte": start_iso}
-    })
-    
-    # Total events by type
-    event_type_pipeline = [
-        {"$match": {"timestamp": {"$gte": start_iso}}},
-        {"$group": {"_id": "$event_type", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}}
-    ]
-    events_by_type = await db.analytics.aggregate(event_type_pipeline).to_list(20)
-    
-    return {
-        "period_days": days,
-        "top_searches": [{"query": item["_id"], "count": item["count"]} for item in top_searches if item["_id"]],
-        "most_viewed_subjects": top_subjects,
-        "most_ask_ai_subjects": top_ask_ai,
-        "document_opens": doc_open_count,
-        "events_by_type": {item["_id"]: item["count"] for item in events_by_type},
-    }
+        subject_view_pipeline = [
+            {"$match": {"event_type": "subject_view", "timestamp": {"$gte": start_iso}, "subject_id": {"$ne": None}}},
+            {"$group": {"_id": "$subject_id", "view_count": {"$sum": 1}}},
+            {"$sort": {"view_count": -1}},
+            {"$limit": 10}
+        ]
+        top_subjects_raw = await db.analytics.aggregate(subject_view_pipeline).to_list(10)
+        
+        if top_subjects_raw:
+            subject_ids = [item["_id"] for item in top_subjects_raw]
+            subjects = await db.subjects.find({"id": {"$in": subject_ids}}, {"_id": 0, "id": 1, "name": 1, "description": 1}).to_list(20)
+            subject_map = {s["id"]: s for s in subjects}
+            top_subjects = []
+            for item in top_subjects_raw:
+                subj = subject_map.get(item["_id"])
+                if subj:
+                    top_subjects.append({"subject_id": item["_id"], "name": subj["name"], "view_count": item["view_count"]})
+        else:
+            top_subjects = []
+        
+        ask_ai_pipeline = [
+            {"$match": {"event_type": "ask_ai_click", "timestamp": {"$gte": start_iso}, "subject_id": {"$ne": None}}},
+            {"$group": {"_id": "$subject_id", "ask_count": {"$sum": 1}}},
+            {"$sort": {"ask_count": -1}},
+            {"$limit": 10}
+        ]
+        top_ask_ai_raw = await db.analytics.aggregate(ask_ai_pipeline).to_list(10)
+        
+        if top_ask_ai_raw:
+            ask_subject_ids = [item["_id"] for item in top_ask_ai_raw]
+            ask_subjects = await db.subjects.find({"id": {"$in": ask_subject_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(20)
+            ask_subject_map = {s["id"]: s["name"] for s in ask_subjects}
+            top_ask_ai = []
+            for item in top_ask_ai_raw:
+                name = ask_subject_map.get(item["_id"], "Unknown")
+                top_ask_ai.append({"subject_id": item["_id"], "name": name, "ask_count": item["ask_count"]})
+        else:
+            top_ask_ai = []
+        
+        doc_open_count = await db.analytics.count_documents({"event_type": "document_open", "timestamp": {"$gte": start_iso}})
+        
+        event_type_pipeline = [
+            {"$match": {"timestamp": {"$gte": start_iso}}},
+            {"$group": {"_id": "$event_type", "count": {"$sum": 1}}},
+            {"$sort": {"count": -1}}
+        ]
+        events_by_type = await db.analytics.aggregate(event_type_pipeline).to_list(20)
+        
+        return {
+            "period_days": days,
+            "top_searches": [{"query": item["_id"], "count": item["count"]} for item in top_searches if item["_id"]],
+            "most_viewed_subjects": top_subjects,
+            "most_ask_ai_subjects": top_ask_ai,
+            "document_opens": doc_open_count,
+            "events_by_type": {item["_id"]: item["count"] for item in events_by_type},
+        }
+    except Exception:
+        return {"period_days": days, "top_searches": [], "most_viewed_subjects": [], "most_ask_ai_subjects": [], "document_opens": 0, "events_by_type": {}}
 
 
 # ─────────────────────────────────────────────
@@ -2553,16 +2564,21 @@ async def get_library_bundle(nocache: Optional[str] = None):
         cached = _get_content_cache("library-bundle")
         if cached: return cached
     await ensure_seeded()
-    boards_data = await db.boards.find({}, {"_id": 0}).to_list(100)
-    classes_data = await db.classes.find({}, {"_id": 0}).to_list(100)
-    streams_data = await db.streams.find({}, {"_id": 0}).to_list(100)
-    subjects_data = await db.subjects.find({"status": "published"}, {"_id": 0}).to_list(500)
-    for s in subjects_data:
-        if "thumbnail_url" in s and "thumbnailUrl" not in s:
-            s["thumbnailUrl"] = s.pop("thumbnail_url")
-    bundle = {"boards": boards_data, "classes": classes_data, "streams": streams_data, "subjects": subjects_data}
-    _set_content_cache("library-bundle", bundle)
-    return bundle
+    try:
+        if not await is_mongo_available():
+            return {"boards": [], "classes": [], "streams": [], "subjects": []}
+        boards_data = await db.boards.find({}, {"_id": 0}).to_list(100)
+        classes_data = await db.classes.find({}, {"_id": 0}).to_list(100)
+        streams_data = await db.streams.find({}, {"_id": 0}).to_list(100)
+        subjects_data = await db.subjects.find({"status": "published"}, {"_id": 0}).to_list(500)
+        for s in subjects_data:
+            if "thumbnail_url" in s and "thumbnailUrl" not in s:
+                s["thumbnailUrl"] = s.pop("thumbnail_url")
+        bundle = {"boards": boards_data, "classes": classes_data, "streams": streams_data, "subjects": subjects_data}
+        _set_content_cache("library-bundle", bundle)
+        return bundle
+    except Exception:
+        return {"boards": [], "classes": [], "streams": [], "subjects": []}
 
 @api.get("/content/boards")
 async def get_boards(nocache: Optional[str] = None):
@@ -2570,9 +2586,14 @@ async def get_boards(nocache: Optional[str] = None):
         cached = _get_content_cache("boards")
         if cached: return cached
     await ensure_seeded()
-    boards = await db.boards.find({}, {"_id": 0}).to_list(100)
-    _set_content_cache("boards", boards)
-    return boards
+    try:
+        if not await is_mongo_available():
+            return []
+        boards = await db.boards.find({}, {"_id": 0}).to_list(100)
+        _set_content_cache("boards", boards)
+        return boards
+    except Exception:
+        return []
 
 @api.get("/content/classes")
 async def get_classes(board_id: Optional[str] = None, nocache: Optional[str] = None):
@@ -2581,10 +2602,15 @@ async def get_classes(board_id: Optional[str] = None, nocache: Optional[str] = N
         cached = _get_content_cache(ck)
         if cached: return cached
     await ensure_seeded()
-    query = {"board_id": board_id} if board_id else {}
-    classes = await db.classes.find(query, {"_id": 0}).to_list(100)
-    _set_content_cache(ck, classes)
-    return classes
+    try:
+        if not await is_mongo_available():
+            return []
+        query = {"board_id": board_id} if board_id else {}
+        classes = await db.classes.find(query, {"_id": 0}).to_list(100)
+        _set_content_cache(ck, classes)
+        return classes
+    except Exception:
+        return []
 
 @api.get("/content/streams")
 async def get_streams(class_id: Optional[str] = None, nocache: Optional[str] = None):
@@ -2593,10 +2619,15 @@ async def get_streams(class_id: Optional[str] = None, nocache: Optional[str] = N
         cached = _get_content_cache(ck)
         if cached: return cached
     await ensure_seeded()
-    query = {"class_id": class_id} if class_id else {}
-    streams = await db.streams.find(query, {"_id": 0}).to_list(100)
-    _set_content_cache(ck, streams)
-    return streams
+    try:
+        if not await is_mongo_available():
+            return []
+        query = {"class_id": class_id} if class_id else {}
+        streams = await db.streams.find(query, {"_id": 0}).to_list(100)
+        _set_content_cache(ck, streams)
+        return streams
+    except Exception:
+        return []
 
 @api.get("/content/subjects")
 async def get_subjects(stream_id: Optional[str] = None, class_id: Optional[str] = None, nocache: Optional[str] = None):
@@ -2605,19 +2636,24 @@ async def get_subjects(stream_id: Optional[str] = None, class_id: Optional[str] 
         cached = _get_content_cache(ck)
         if cached: return cached
     await ensure_seeded()
-    if stream_id:
-        subjects = await db.subjects.find({"stream_id": stream_id, "status": "published"}, {"_id": 0}).to_list(100)
-    elif class_id:
-        streams = await db.streams.find({"class_id": class_id}, {"_id": 0}).to_list(100)
-        stream_ids = [s["id"] for s in streams]
-        subjects = await db.subjects.find({"stream_id": {"$in": stream_ids}, "status": "published"}, {"_id": 0}).to_list(500)
-    else:
-        subjects = await db.subjects.find({"status": "published"}, {"_id": 0}).to_list(500)
-    for s in subjects:
-        if "thumbnail_url" in s and "thumbnailUrl" not in s:
-            s["thumbnailUrl"] = s.pop("thumbnail_url")
-    _set_content_cache(ck, subjects)
-    return subjects
+    try:
+        if not await is_mongo_available():
+            return []
+        if stream_id:
+            subjects = await db.subjects.find({"stream_id": stream_id, "status": "published"}, {"_id": 0}).to_list(100)
+        elif class_id:
+            streams = await db.streams.find({"class_id": class_id}, {"_id": 0}).to_list(100)
+            stream_ids = [s["id"] for s in streams]
+            subjects = await db.subjects.find({"stream_id": {"$in": stream_ids}, "status": "published"}, {"_id": 0}).to_list(500)
+        else:
+            subjects = await db.subjects.find({"status": "published"}, {"_id": 0}).to_list(500)
+        for s in subjects:
+            if "thumbnail_url" in s and "thumbnailUrl" not in s:
+                s["thumbnailUrl"] = s.pop("thumbnail_url")
+        _set_content_cache(ck, subjects)
+        return subjects
+    except Exception:
+        return []
 
 @api.get("/content/resolve-subject/{board_slug}/{class_slug}/{stream_slug}/{subject_slug}")
 async def resolve_subject(board_slug: str, class_slug: str, stream_slug: str, subject_slug: str):
@@ -2625,6 +2661,8 @@ async def resolve_subject(board_slug: str, class_slug: str, stream_slug: str, su
     cached = _get_content_cache(ck)
     if cached: return cached
     await ensure_seeded()
+    if not await is_mongo_available():
+        raise HTTPException(503, "Content database unavailable")
     board = await db.boards.find_one({"slug": board_slug}, {"_id": 0})
     if not board: raise HTTPException(404, "Board not found")
     cls = await db.classes.find_one({"slug": class_slug, "board_id": board["id"]}, {"_id": 0})
@@ -2643,6 +2681,8 @@ async def get_subject(subject_id: str):
     cached = _get_content_cache(ck)
     if cached: return cached
     await ensure_seeded()
+    if not await is_mongo_available():
+        raise HTTPException(503, "Content database unavailable")
     subj = await db.subjects.find_one({"id": subject_id}, {"_id": 0})
     if not subj:
         raise HTTPException(status_code=404, detail="Subject not found")
@@ -2767,9 +2807,14 @@ async def get_chapters(subject_id: str):
     cached = _get_content_cache(ck)
     if cached: return cached
     await ensure_seeded()
-    chapters = await db.chapters.find({"subject_id": subject_id}, {"_id": 0}).sort("order_index", 1).to_list(100)
-    _set_content_cache(ck, chapters)
-    return chapters
+    try:
+        if not await is_mongo_available():
+            return []
+        chapters = await db.chapters.find({"subject_id": subject_id}, {"_id": 0}).sort("order_index", 1).to_list(100)
+        _set_content_cache(ck, chapters)
+        return chapters
+    except Exception:
+        return []
 
 @api.get("/content/chunks/{chapter_id}")
 async def get_chunks(chapter_id: str):
@@ -2777,25 +2822,35 @@ async def get_chunks(chapter_id: str):
     cached = _get_content_cache(ck)
     if cached: return cached
     await ensure_seeded()
-    chunks = await db.chunks.find({"chapter_id": chapter_id}, {"_id": 0}).to_list(200)
-    _set_content_cache(ck, chunks)
-    return chunks
+    try:
+        if not await is_mongo_available():
+            return []
+        chunks = await db.chunks.find({"chapter_id": chapter_id}, {"_id": 0}).to_list(200)
+        _set_content_cache(ck, chunks)
+        return chunks
+    except Exception:
+        return []
 
 @api.get("/content/search")
 async def search_content(q: str):
     await ensure_seeded()
     if len(q) < 2:
         return []
-    ck = f"search:{q.lower().strip()}"
-    cached = _get_content_cache(ck)
-    if cached: return cached
-    regex = re.compile(q, re.IGNORECASE)
-    subjects = await db.subjects.find(
-        {"$or": [{"name": regex}, {"description": regex}, {"tags": regex}], "status": "published"},
-        {"_id": 0}
-    ).to_list(20)
-    _set_content_cache(ck, subjects)
-    return subjects
+    try:
+        if not await is_mongo_available():
+            return []
+        ck = f"search:{q.lower().strip()}"
+        cached = _get_content_cache(ck)
+        if cached: return cached
+        regex = re.compile(q, re.IGNORECASE)
+        subjects = await db.subjects.find(
+            {"$or": [{"name": regex}, {"description": regex}, {"tags": regex}], "status": "published"},
+            {"_id": 0}
+        ).to_list(20)
+        _set_content_cache(ck, subjects)
+        return subjects
+    except Exception:
+        return []
 
 # ─────────────────────────────────────────────
 # AI CHAT ROUTES
@@ -3319,7 +3374,10 @@ async def admin_dashboard(admin: dict = Depends(get_admin_user)):
     total_convs = await supa_count_conversations()
     all_convs = await supa_get_all_conversations(1000)
     total_messages = sum(len(c.get("messages", [])) for c in all_convs)
-    total_subjects = await db.subjects.count_documents({})
+    try:
+        total_subjects = await db.subjects.count_documents({}) if await is_mongo_available() else 0
+    except Exception:
+        total_subjects = 0
     users = await supa_list_users()
     plan_dist = {}
     for u in users:
@@ -4024,14 +4082,20 @@ async def get_content_uploads(
     admin: dict = Depends(get_admin_user)
 ):
     """Get uploaded content filtered by subject and type"""
-    query = {}
-    if subject_id:
-        query["subject_id"] = subject_id
-    if type:
-        query["content_type"] = type
-    
-    uploads = await db.content_uploads.find(query, {"_id": 0}).sort("uploaded_at", -1).limit(100).to_list(100)
-    return uploads
+    try:
+        if not await is_mongo_available():
+            return []
+        query = {}
+        if subject_id:
+            query["subject_id"] = subject_id
+        if type:
+            query["content_type"] = type
+        
+        uploads = await db.content_uploads.find(query, {"_id": 0}).sort("uploaded_at", -1).limit(100).to_list(100)
+        return uploads
+    except Exception:
+        mark_mongo_down()
+        return []
 
 @api.delete("/admin/content/uploads/{content_id}")
 async def delete_content_upload(content_id: str, admin: dict = Depends(get_admin_user)):
@@ -4153,52 +4217,40 @@ async def get_chunking_stats(admin: dict = Depends(get_admin_user)):
     Get statistics about content chunking across the platform.
     Useful for monitoring RAG quality.
     """
-    # Total chunks
-    total_chunks = await db.chunks.count_documents({})
-    
-    # Chunks by subject
-    pipeline = [
-        {"$group": {
-            "_id": "$subject_id",
-            "count": {"$sum": 1},
-            "avg_size": {"$avg": "$char_count"}
-        }},
-        {"$sort": {"count": -1}},
-        {"$limit": 10}
-    ]
-    chunks_by_subject = await db.chunks.aggregate(pipeline).to_list(10)
-    
-    # Get subject names
-    if chunks_by_subject:
-        subject_ids = [item["_id"] for item in chunks_by_subject if item["_id"]]
-        subjects = await db.subjects.find(
-            {"id": {"$in": subject_ids}},
-            {"_id": 0, "id": 1, "name": 1}
-        ).to_list(20)
-        subject_map = {s["id"]: s["name"] for s in subjects}
-        
-        for item in chunks_by_subject:
-            item["subject_name"] = subject_map.get(item["_id"], "Unknown")
-    
-    # Chapters with/without chunks
-    total_chapters = await db.chapters.count_documents({})
-    chapters_with_content = await db.chapters.count_documents({"content": {"$exists": True, "$ne": ""}})
-    
-    # Chapters that have chunks
-    chunked_chapter_ids = await db.chunks.distinct("chapter_id")
-    chapters_with_chunks = len(chunked_chapter_ids)
-    chapters_without_chunks = chapters_with_content - chapters_with_chunks
-    
-    return {
-        "total_chunks": total_chunks,
-        "total_chapters": total_chapters,
-        "chapters_with_content": chapters_with_content,
-        "chapters_with_chunks": chapters_with_chunks,
-        "chapters_without_chunks": chapters_without_chunks,
-        "coverage_percent": round((chapters_with_chunks / chapters_with_content * 100) if chapters_with_content > 0 else 0, 1),
-        "top_subjects_by_chunks": chunks_by_subject,
-        "recommendation": "Run /admin/content/bulk-rechunk to chunk all chapters" if chapters_without_chunks > 0 else "All content is chunked ✅"
-    }
+    try:
+        if not await is_mongo_available():
+            return {"total_chunks": 0, "total_chapters": 0, "chapters_with_content": 0, "chapters_with_chunks": 0, "chapters_without_chunks": 0, "coverage_percent": 0, "top_subjects_by_chunks": [], "recommendation": "MongoDB unavailable"}
+        total_chunks = await db.chunks.count_documents({})
+        pipeline = [
+            {"$group": {"_id": "$subject_id", "count": {"$sum": 1}, "avg_size": {"$avg": "$char_count"}}},
+            {"$sort": {"count": -1}},
+            {"$limit": 10}
+        ]
+        chunks_by_subject = await db.chunks.aggregate(pipeline).to_list(10)
+        if chunks_by_subject:
+            subject_ids = [item["_id"] for item in chunks_by_subject if item["_id"]]
+            subjects = await db.subjects.find({"id": {"$in": subject_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(20)
+            subject_map = {s["id"]: s["name"] for s in subjects}
+            for item in chunks_by_subject:
+                item["subject_name"] = subject_map.get(item["_id"], "Unknown")
+        total_chapters = await db.chapters.count_documents({})
+        chapters_with_content = await db.chapters.count_documents({"content": {"$exists": True, "$ne": ""}})
+        chunked_chapter_ids = await db.chunks.distinct("chapter_id")
+        chapters_with_chunks = len(chunked_chapter_ids)
+        chapters_without_chunks = chapters_with_content - chapters_with_chunks
+        return {
+            "total_chunks": total_chunks,
+            "total_chapters": total_chapters,
+            "chapters_with_content": chapters_with_content,
+            "chapters_with_chunks": chapters_with_chunks,
+            "chapters_without_chunks": chapters_without_chunks,
+            "coverage_percent": round((chapters_with_chunks / chapters_with_content * 100) if chapters_with_content > 0 else 0, 1),
+            "top_subjects_by_chunks": chunks_by_subject,
+            "recommendation": "Run /admin/content/bulk-rechunk to chunk all chapters" if chapters_without_chunks > 0 else "All content is chunked"
+        }
+    except Exception:
+        mark_mongo_down()
+        return {"total_chunks": 0, "total_chapters": 0, "chapters_with_content": 0, "chapters_with_chunks": 0, "chapters_without_chunks": 0, "coverage_percent": 0, "top_subjects_by_chunks": [], "recommendation": "MongoDB unavailable"}
 
 
 
@@ -4525,8 +4577,14 @@ class CMSDocument(BaseModel):
 @api.get("/admin/content/cms-documents")
 async def get_cms_documents(admin: dict = Depends(get_admin_user)):
     """Get all CMS documents for admin"""
-    docs = await db.cms_documents.find({}, {"_id": 0}).sort("updated_at", -1).limit(100).to_list(100)
-    return docs
+    try:
+        if not await is_mongo_available():
+            return []
+        docs = await db.cms_documents.find({}, {"_id": 0}).sort("updated_at", -1).limit(100).to_list(100)
+        return docs
+    except Exception:
+        mark_mongo_down()
+        return []
 
 @api.post("/admin/content/cms-documents")
 async def create_cms_document(doc: CMSDocument, admin: dict = Depends(get_admin_user)):
@@ -4660,22 +4718,36 @@ async def upload_image(file: bytes = File(...), admin: dict = Depends(get_admin_
 @api.get("/content/cms-library")
 async def get_public_cms_library():
     """Get published CMS documents for public library"""
-    docs = await db.cms_documents.find(
-        {"status": "published"},
-        {"_id": 0, "content": 0}  # Exclude full content
-    ).sort("updated_at", -1).limit(50).to_list(50)
-    return docs
+    try:
+        if not await is_mongo_available():
+            return []
+        docs = await db.cms_documents.find(
+            {"status": "published"},
+            {"_id": 0, "content": 0}
+        ).sort("updated_at", -1).limit(50).to_list(50)
+        return docs
+    except Exception:
+        mark_mongo_down()
+        return []
 
 @api.get("/content/cms-documents/{doc_id}")
 async def get_public_cms_document(doc_id: str):
     """Get single CMS document for public view"""
-    doc = await db.cms_documents.find_one(
-        {"$or": [{"id": doc_id}, {"seo_slug": doc_id}], "status": "published"},
-        {"_id": 0}
-    )
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return doc
+    try:
+        if not await is_mongo_available():
+            raise HTTPException(status_code=503, detail="Content service unavailable")
+        doc = await db.cms_documents.find_one(
+            {"$or": [{"id": doc_id}, {"seo_slug": doc_id}], "status": "published"},
+            {"_id": 0}
+        )
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return doc
+    except HTTPException:
+        raise
+    except Exception:
+        mark_mongo_down()
+        raise HTTPException(status_code=503, detail="Content service unavailable")
 
 @api.post("/admin/content/regenerate-sitemap")
 async def regenerate_sitemap(admin: dict = Depends(get_admin_user)):
@@ -4848,41 +4920,44 @@ async def get_document(document_id: str):
     Get document details including PDF URL.
     Supports both legacy base64 and new Supabase Storage URLs.
     """
-    doc = await db.content_uploads.find_one({"id": document_id}, {"_id": 0})
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-    
-    # For backward compatibility: if pdf_data_url exists (old format), keep it
-    # If pdf_url exists (new format), use it
-    # Frontend will handle both formats
-    
-    return doc
+    try:
+        if not await is_mongo_available():
+            raise HTTPException(status_code=503, detail="Content service unavailable")
+        doc = await db.content_uploads.find_one({"id": document_id}, {"_id": 0})
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return doc
+    except HTTPException:
+        raise
+    except Exception:
+        mark_mongo_down()
+        raise HTTPException(status_code=503, detail="Content service unavailable")
 
 
 @api.get("/content/subject-documents/{subject_id}")
 async def get_subject_documents(subject_id: str, include_pdf: bool = False):
     """
     Get all documents for a subject.
-    
-    Query params:
-    - include_pdf: If true, includes pdf_url or pdf_data_url (default: false for performance)
     """
-    projection = {"_id": 0}
-    
-    # Exclude large fields by default for performance
-    if not include_pdf:
-        projection["extracted_text"] = 0
-        projection["pdf_data_url"] = 0  # Legacy base64
-        projection["pdf_url"] = 0        # New Supabase URL
-    else:
-        # Only exclude extracted_text when including PDF for viewing
-        projection["extracted_text"] = 0
-    
-    docs = await db.content_uploads.find(
-        {"subject_id": subject_id},
-        projection
-    ).to_list(20)
-    return docs
+    try:
+        if not await is_mongo_available():
+            return []
+        projection = {"_id": 0}
+        if not include_pdf:
+            projection["extracted_text"] = 0
+            projection["pdf_data_url"] = 0
+            projection["pdf_url"] = 0
+        else:
+            projection["extracted_text"] = 0
+        
+        docs = await db.content_uploads.find(
+            {"subject_id": subject_id},
+            projection
+        ).to_list(20)
+        return docs
+    except Exception:
+        mark_mongo_down()
+        return []
 
 
 @api.delete("/admin/content/documents/{document_id}")
@@ -5024,14 +5099,15 @@ async def readiness():
 
 @api.get("/health")
 async def health():
-    kv_ok = True
+    kv_ok = await is_mongo_available()
     kv_latency = 0
-    try:
-        t0 = _time_mod.time()
-        await db.boards.find_one({})
-        kv_latency = int((_time_mod.time() - t0) * 1000)
-    except Exception:
-        kv_ok = False
+    if kv_ok:
+        try:
+            t0 = _time_mod.time()
+            await db.boards.find_one({})
+            kv_latency = int((_time_mod.time() - t0) * 1000)
+        except Exception:
+            kv_ok = False
 
     redis_ok = False
     if redis_client:
@@ -5041,6 +5117,8 @@ async def health():
         except Exception:
             pass
 
+    mongo_status = "ok" if kv_ok else "unavailable"
+
     return {
         "status": "ok",
         "version": "2.0.0",
@@ -5048,7 +5126,7 @@ async def health():
         "workers": int(os.environ.get("GUNICORN_WORKERS", 3)),
         "uptime_seconds": int(_time_mod.time() - _startup_time),
         "dependencies": {
-            "mongodb": {"status": "ok" if kv_ok else "error", "latencyMs": kv_latency},
+            "mongodb": {"status": mongo_status, "latencyMs": kv_latency},
             "redis": {"status": "ok" if redis_ok else "not_connected"},
             "llm": {
                 "status": "ok" if OPENAI_API_KEY else "not_configured",

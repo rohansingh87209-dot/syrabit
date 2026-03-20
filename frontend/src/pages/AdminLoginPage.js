@@ -20,9 +20,8 @@ export default function AdminLoginPage() {
     setLoading(true);
     try {
       const res = await adminLogin(email, password);
-      if (res.data?.access_token) {
-        sessionStorage.setItem('syrabit:admin_token', res.data.access_token);
-      }
+      // Token is automatically set in httpOnly cookie by backend
+      // No need to store in sessionStorage (security best practice)
       toast.success(`Welcome back, ${res.data.name || 'Admin'}!`, {
         description: 'Admin session started',
       });

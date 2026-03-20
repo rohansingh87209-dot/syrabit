@@ -51,13 +51,17 @@ export const saveOnboarding = (data) =>
 export const adminLogin = (email, password) =>
   axios.post(`${API_BASE}/admin/login`, { email, password }, { withCredentials: true });
 
-const adminHeaders = (token) => ({
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-});
+const adminHeaders = (token) => {
+  // If no token provided, rely on httpOnly cookie via withCredentials
+  // If token provided (for backward compatibility), use it in header
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 export const adminVerify = (token) =>
+  // Always use withCredentials to send httpOnly cookie
+  // Token param is optional - backend reads from cookie if not provided
   axios.get(`${API_BASE}/admin/verify`, {
-    headers: adminHeaders(token),
+    ...(token ? { headers: adminHeaders(token) } : {}),
     withCredentials: true,
   });
 

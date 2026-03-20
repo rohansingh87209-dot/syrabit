@@ -89,21 +89,19 @@ export default function AdminPage() {
 
   const [adminEmail, setAdminEmail] = useState('');
   const [adminName,  setAdminName]  = useState('Admin');
-  const [adminToken, setAdminToken] = useState(
-    () => { try { return sessionStorage.getItem('syrabit:admin_token') || null; } catch { return null; } }
-  );
+  const [adminToken, setAdminToken] = useState(null);
 
-  // ── Verify admin session ─────────────────────────────────────────────────
+  // ── Verify admin session (uses httpOnly cookie via withCredentials) ───────
   useEffect(() => {
-    const storedToken = adminToken;
-    adminVerify(storedToken)
+    adminVerify(null)
       .then((res) => {
         if (res.data?.name) setAdminName(res.data.name);
         if (res.data?.email) setAdminEmail(res.data.email);
+        setAdminToken('verified'); // Flag that session is valid
         setVerifying(false);
       })
       .catch(() => {
-        sessionStorage.removeItem('syrabit:admin_token');
+        // Session invalid - redirect to login
         navigate('/admin/login');
       });
   }, [navigate]);
@@ -140,8 +138,9 @@ export default function AdminPage() {
   }, [verifying, adminToken]);
 
   const handleLogout = async () => {
-    await adminLogout();
-    try { sessionStorage.removeItem('syrabit:admin_token'); } catch {}
+    // Call logout endpoint - this clears the httpOnly cookie server-side
+    await adminLogout().catch(() => {});
+    setAdminToken(null);
     toast.success('Logged out');
     navigate('/admin/login');
   };

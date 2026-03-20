@@ -393,7 +393,6 @@ const SubjectCard = memo(function SubjectCard({ sub, isSaved, onToggleSave, onOp
             }}
             data-testid="subject-ask-ai-button"
           >
-            <Sparkles size={14} />
             Ask AI
           </button>
         </div>

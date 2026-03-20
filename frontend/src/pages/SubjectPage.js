@@ -150,7 +150,7 @@ export default function SubjectPage() {
             </div>
             <Link to={`/chat?subject=${subjectId}`}>
               <Button className="bg-primary hover:bg-primary/90 text-primary-foreground flex-shrink-0">
-                <MessageSquare size={16} className="mr-2" /> Ask AI
+                Ask AI
               </Button>
             </Link>
           </div>
@@ -212,7 +212,7 @@ export default function SubjectPage() {
                     <div className="mt-3">
                       <Link to={`/chat?subject=${subjectId}`}>
                         <Button size="sm" className="text-xs bg-primary hover:bg-primary/90 text-primary-foreground">
-                          <MessageSquare size={12} className="mr-1" /> Ask AI about this chapter
+                          Ask AI about this chapter
                         </Button>
                       </Link>
                     </div>

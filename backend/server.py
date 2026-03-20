@@ -3806,7 +3806,8 @@ async def admin_create_chunk(data: ChunkCreate, admin: dict = Depends(get_admin_
         "tags": data.tags,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    await db.chunks.insert_one(chunk)
+    result = await db.chunks.insert_one(chunk)
+    chunk["_id"] = str(result.inserted_id)
     return chunk
 
 

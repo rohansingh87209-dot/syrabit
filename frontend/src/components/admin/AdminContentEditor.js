@@ -429,32 +429,32 @@ export default function AdminContentEditor({ adminToken }) {
       {/* Content Manager Tab */}
       {activeTab === 'content' && (
         <>
-      <div className="h-14 border-b border-white/10 flex items-center justify-between px-6" style={{ background: 'rgba(255,255,255,0.02)' }}>
-        <div className="flex items-center gap-2 min-w-0">
-          {breadcrumb.length > 0 && (
-            <div className="flex items-center gap-1 text-sm text-white/40 min-w-0 overflow-hidden">
-              {breadcrumb.map((b, i) => (
-                <span key={i} className="flex items-center gap-1 min-w-0">
-                  <ChevronRight size={12} className="flex-shrink-0" />
-                  <button onClick={b.onClick} className="hover:text-violet-400 truncate max-w-[120px] transition-colors">{b.label}</button>
-                </span>
-              ))}
+          <div className="h-14 border-b border-white/10 flex items-center justify-between px-6" style={{ background: 'rgba(255,255,255,0.02)' }}>
+            <div className="flex items-center gap-2 min-w-0">
+              {breadcrumb.length > 0 && (
+                <div className="flex items-center gap-1 text-sm text-white/40 min-w-0 overflow-hidden">
+                  {breadcrumb.map((b, i) => (
+                    <span key={i} className="flex items-center gap-1 min-w-0">
+                      <ChevronRight size={12} className="flex-shrink-0" />
+                      <button onClick={b.onClick} className="hover:text-violet-400 truncate max-w-[120px] transition-colors">{b.label}</button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        <div className="relative flex-shrink-0 w-64">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
-          <input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search all subjects..."
-            className="w-full h-9 pl-8 pr-3 rounded-xl text-sm text-white bg-white/5 border border-white/10 outline-none focus:border-violet-500"
-            data-testid="search-subjects"
-          />
-        </div>
-      </div>
+            <div className="relative flex-shrink-0 w-64">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search all subjects..."
+                className="w-full h-9 pl-8 pr-3 rounded-xl text-sm text-white bg-white/5 border border-white/10 outline-none focus:border-violet-500"
+                data-testid="search-subjects"
+              />
+            </div>
+          </div>
 
-      {searchQuery && searchFiltered ? (
+          {searchQuery && searchFiltered ? (
         <div className="flex-1 overflow-y-auto p-6">
           <p className="text-sm text-white/40 mb-4">{searchFiltered.length} subject(s) matching "{searchQuery}"</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -688,6 +688,7 @@ export default function AdminContentEditor({ adminToken }) {
             ) : null}
           </div>
         </div>
+        )}
         </>
       )}
 

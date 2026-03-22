@@ -1800,12 +1800,14 @@ def build_rag_system_prompt(
     rag_context: dict,
     user_info: dict = None,
     query: str = "",
+    syllabus: dict = None,
 ) -> str:
     """
     Selects the adaptive prompt mode (casual / concise / structured) based on
     the student's query, injects their profile, then appends RAG grounding.
 
     Grounding tiers:
+      Tier -1 — syllabus constraints (curriculum boundaries)
       Tier 0 — document (uploaded .txt file — absolute priority)
       Tier 1 — DB content chunks
       Tier 2 — Subject metadata (descriptions, tags, chapter titles)
@@ -1822,9 +1824,29 @@ def build_rag_system_prompt(
 
     grounding = ""
 
+    # ── Tier -1: Syllabus constraints (curriculum boundaries) ───────────────────
+    if syllabus and syllabus.get("content"):
+        syllabus_content = syllabus.get("content", "")
+        syllabus_topics = ", ".join(syllabus.get("topics", [])[:10])
+        grounding = (
+            "\n\n---\n"
+            "**CURRICULUM CONSTRAINTS (Tier -1 — Board Syllabus):**\n"
+            "You are helping a student from the AHSEC/Degree curriculum. "
+            "The following represents what this student is expected to know:\n\n"
+            f"{syllabus_content}\n\n"
+        )
+        if syllabus_topics:
+            grounding += f"**Key topics:** {syllabus_topics}\n\n"
+        grounding += (
+            "---\n"
+            "*INSTRUCTION: Keep your answer within the scope of this curriculum. "
+            "Do not introduce concepts beyond the standard curriculum unless explicitly requested. "
+            "Prioritize accuracy over breadth.*\n"
+        )
+
     # ── Tier 0: Uploaded subject document ────────────────────────────────────
     if source == "document" and document_text:
-        grounding = (
+        grounding += (
             "\n\n---\n"
             "**GROUNDING CONTEXT (Tier 0 — Uploaded Study Document):**\n"
             "The student is asking about content from a specific uploaded study document. "
@@ -3004,6 +3026,16 @@ async def chat(msg: ChatMessage, user: dict = Depends(rate_limit_chat)):
             document_text = subj["document_text"]
             logger.info(f"Chat [NON-STREAM]: Tier 0 doc loaded from subject {msg.document_id}")
 
+    # ── Fetch syllabus for board+class (curriculum constraints) ──────────────
+    syllabus = None
+    if msg.board_id and msg.class_id:
+        try:
+            syllabus = await db.syllabi.find_one({"board_id": msg.board_id, "class_id": msg.class_id}, {"_id": 0})
+            if syllabus:
+                logger.info(f"Chat [NON-STREAM]: Syllabus loaded for {msg.board_id}/{msg.class_id}")
+        except Exception as e:
+            logger.error(f"Failed to fetch syllabus: {e}")
+
     # ── RAG → Web priority chain ──────────────────────────────────────────────
     rag_ctx = await resolve_rag_context(
         msg.message,
@@ -3030,6 +3062,7 @@ async def chat(msg: ChatMessage, user: dict = Depends(rate_limit_chat)):
             "plan":        user.get("plan", "free"),
         },
         query=msg.message,
+        syllabus=syllabus,
     )
 
     conv_id = msg.conversation_id
@@ -3136,6 +3169,16 @@ async def chat_stream(msg: ChatMessage, user: dict = Depends(rate_limit_chat)):
             document_text = subj["document_text"]
             logger.info(f"Chat [STREAM]: Tier 0 doc loaded from subject {msg.document_id}")
 
+    # ── Fetch syllabus for board+class (curriculum constraints) ──────────────
+    syllabus = None
+    if msg.board_id and msg.class_id:
+        try:
+            syllabus = await db.syllabi.find_one({"board_id": msg.board_id, "class_id": msg.class_id}, {"_id": 0})
+            if syllabus:
+                logger.info(f"Chat [STREAM]: Syllabus loaded for {msg.board_id}/{msg.class_id}")
+        except Exception as e:
+            logger.error(f"Failed to fetch syllabus: {e}")
+
     # ── RAG → Web priority chain (streaming endpoint) ────────────────────────
     rag_ctx = await resolve_rag_context(
         msg.message,
@@ -3162,6 +3205,7 @@ async def chat_stream(msg: ChatMessage, user: dict = Depends(rate_limit_chat)):
             "plan":        user.get("plan", "free"),
         },
         query=msg.message,
+        syllabus=syllabus,
     )
 
     conv_id = msg.conversation_id

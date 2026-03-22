@@ -1,0 +1,208 @@
+ou can design a perfect‑fit architecture where:
+
+Supabase handles structure + metadata + user sessions,
+
+MongoDB stores your library‑style content,
+
+and your LLM chatbot never does classic RAG, but instead always hits your own “library‑search API” that only reads from your library pages.
+
+Below is a concrete blueprint for Syrabit‑style syllabus‑ and content‑aware tutoring.
+
+1. Overall architecture (big picture)
+Frontend
+
+Your app (FlutterFlow / web) → talks to your backend API (e.g., Python/FastAPI or Node).
+
+Backend
+
+Two responsibilities:
+
+User & syllabus routing (via Supabase).
+
+Library‑search API (via MongoDB + custom logic).
+
+LLM gateway
+
+Takes:
+
+User input.
+
+Output from the library‑search API.
+
+Builds a syllabus‑aware prompt without fine‑tuning.
+
+2. How to divide Supabase vs MongoDB
+Supabase (PostgreSQL) – “source of truth” for structure
+Keep in Supabase:
+
+Users
+
+users(id, board, class, subject, active_school, ...)
+
+Syllabus graph
+
+boards, classes, subjects, chapters, topics
+
+Links: what chapters belong to which board + class + subject.
+
+Library mapping
+
+library_pages(id, board, class, subject, chapter, url_or_slug, last_scraped_at)
+
+This tells you:
+
+“For CBSE Class 9 Physics Ch 3, which library page(s) are allowed?”.
+
+These are “rules” for your bot, not raw content.
+
+MongoDB – “library page storage engine”
+Use MongoDB for:
+
+library_scrapes collection
+
+Each doc:
+
+page_id (from Supabase).
+
+source_url (your library page URL).
+
+markdown / html (or plain text) of the page.
+
+sections (parsed: Theory, Examples, Exercises, Diagrams, Formulas, etc.).
+
+Optionally:
+
+user_library_views (logs of which pages a student looked at).
+
+Your library‑search API will query this MongoDB collection, not Supabase, so your LLM only sees your curated library.
+
+3. The “library‑search API” that your LLM always hits
+Design a single API endpoint your backend always calls before sending to the LLM:
+
+text
+GET /api/library_search
+  ? board=CBSE
+  & class=9
+  & subject=Physics
+  & chapter=Force and Laws of Motion
+  & query=Explain Newton's Laws
+Your backend does:
+
+Map to your library pages
+
+Query Supabase:
+
+“Which library pages are assigned to CBSE 9 Physics Force and Laws of Motion?”
+
+Get page_ids = [P1, P2, P3].
+
+Fetch from MongoDB
+
+db.library_scrapes.find({page_id: {$in: [P1, P2, P3]}})
+
+Optional: use text‑search inside MongoDB to rank pages by relevance to query.
+
+Extract and clean
+
+For each page, extract:
+
+Clearly‑marked theory, formulas, examples, diagram descriptions.
+
+Return a structured JSON:
+
+json
+{
+  "board": "CBSE",
+  "class": 9,
+  "subject": "Physics",
+  "chapter": "Force and Laws of Motion",
+  "pages": [
+    {
+      "title": "Newton's Laws Explanation",
+      "sections": {
+        "theory": "A force acting on a body produces acceleration...",
+        "formulas": "F = ma, P = mv...",
+        "examples": "Example 1: A 2 kg object..."
+      }
+    }
+  ]
+}
+Pass that JSON into the LLM
+
+Your prompt:
+
+text
+You are a strict CBSE Class 9 Physics tutor. Only use the following library page content:
+
+BOARD: CBSE
+CLASS: 9
+SUBJECT: Physics
+CHAPTER: Force and Laws of Motion
+
+LIBRARY PAGES:
+- [P1] Title: "Newton's Laws Explanation"
+  - Theory: [extracted_theory]
+  - Formulas: [extracted_formulas]
+  - Examples: [extracted_examples]
+
+Do not invent new formulas or concepts outside these pages.
+
+Student question: Explain Newton's Laws.
+No RAG, just API‑driven content injection from your library.
+
+4. How this fits your stack
+Supabase
+
+Drives who is who (board/class/subject) and which library pages are allowed.
+
+You can even add auth + real‑time for live tutoring dashboards.
+
+MongoDB
+
+Stores all scraped pages and lets you:
+
+Update the library independently of your syllabus metadata.
+
+Add new pages, new boards without touching your Supabase schema.
+
+You keep control
+
+You decide which pages Syrabit is allowed to use at any time.
+
+No vector‑based RAG index; you’re just searching your own library by page.
+
+5. Concrete “Syrabit API flow” per question
+User asks:
+“Explain Newton’s Laws for Class 9 CBSE Physics.”
+
+Backend:
+
+Gets user: board=CBSB, class=9, subject=Physics.
+
+Enriches with chapter: chapter=Force and Laws of Motion (via subject‑to‑chapter mapping in Supabase).
+
+Calls your library‑search API:
+
+GET /api/library_search?board=CBSE&class=9&subject=Physics&chapter=Force and Laws of Motion&query=Explain Newton's Laws
+
+Receives library pages JSON.
+
+Sends to LLM with restricted prompt (only from those pages).
+
+Returns answer to the user.
+
+6. If you ever want to add RAG later
+Even though you said “no RAG for now”, you can evolve:
+
+Keep the library‑search API exactly as above.
+
+Add an optional similarity layer:
+
+Precompute embeddings for each page/section (stored in MongoDB or Supabase).
+
+When a query comes in, rank pages by relevance with a vector‑search before you return them.
+
+But your LLM still only sees your API‑structured response, not raw vectors.
+
+This keeps the “only my library pages” constraint intact while quietly getting RAG‑like benefits.
+

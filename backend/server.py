@@ -3,7 +3,7 @@ Syrabit.ai Backend - FastAPI + MongoDB
 AHSEC AI-Powered Educational Platform
 """
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, BackgroundTasks, File, UploadFile, Form, Response, Cookie, Body
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, BackgroundTasks, File, UploadFile, Form, Response, Cookie, Body, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse, FileResponse
@@ -410,7 +410,9 @@ class ChatMessage(BaseModel):
     subject_name: Optional[str] = None
     chapter_id: Optional[str] = None
     chapter_name: Optional[str] = None
+    board_id: Optional[str] = None
     board_name: Optional[str] = None
+    class_id: Optional[str] = None
     class_name: Optional[str] = None
     stream_name: Optional[str] = None
     model: Optional[str] = None  # Defaults to LLM_MODEL from env (gemini-2.0-flash-exp)
@@ -2851,6 +2853,135 @@ async def search_content(q: str):
         return subjects
     except Exception:
         return []
+
+# ─────────────────────────────────────────────
+# LIBRARY SEARCH & SYLLABUS ROUTES (RAG System)
+# ─────────────────────────────────────────────
+
+@api.get("/library_search")
+async def library_search(
+    board: Optional[str] = None,
+    class_: Optional[str] = Query(None, alias="class"),
+    subject: Optional[str] = None,
+    chapter: Optional[str] = None,
+    query: str = "",
+):
+    """Library-search API for RAG system. Returns structured content from MongoDB library_scrapes collection."""
+    await ensure_seeded()
+    try:
+        if not await is_mongo_available():
+            return {"board": board, "class": class_, "subject": subject, "chapter": chapter, "pages": [], "source": "none"}
+        
+        lib_filter = {}
+        if board:
+            lib_filter["board"] = board
+        if class_:
+            lib_filter["class"] = class_
+        if subject:
+            lib_filter["subject"] = subject
+        if chapter:
+            lib_filter["chapter"] = chapter
+        
+        if query:
+            query_regex = re.compile(query, re.IGNORECASE)
+            lib_filter["$or"] = [
+                {"sections.theory": query_regex},
+                {"sections.formulas": query_regex},
+                {"sections.examples": query_regex},
+                {"title": query_regex},
+            ]
+        
+        pages = await db.library_scrapes.find(lib_filter, {"_id": 0}).to_list(10)
+        logger.info(f"Library search: {board}/{class_}/{subject}/{chapter} - found {len(pages)} pages")
+        return {
+            "board": board,
+            "class": class_,
+            "subject": subject,
+            "chapter": chapter,
+            "pages": pages,
+            "source": "library",
+            "count": len(pages)
+        }
+    except Exception as e:
+        logger.error(f"Library search error: {e}")
+        return {"board": board, "class": class_, "subject": subject, "chapter": chapter, "pages": [], "source": "error"}
+
+
+@api.get("/syllabi/{board_id}/{class_id}")
+async def get_syllabus(board_id: str, class_id: str):
+    """Fetch syllabus for a board+class. Returns structured syllabus content to inject into LLM prompts."""
+    try:
+        if not await is_mongo_available():
+            return {"board_id": board_id, "class_id": class_id, "content": "", "chapters": [], "topics": [], "found": False}
+        
+        syllabus = await db.syllabi.find_one({"board_id": board_id, "class_id": class_id}, {"_id": 0})
+        
+        if syllabus:
+            logger.info(f"Syllabus found: {board_id}/{class_id}")
+            return syllabus
+        else:
+            return {"board_id": board_id, "class_id": class_id, "content": "", "chapters": [], "topics": [], "found": False}
+    except Exception as e:
+        logger.error(f"Get syllabus error: {e}")
+        return {"board_id": board_id, "class_id": class_id, "content": "", "chapters": [], "topics": [], "found": False}
+
+
+@api.post("/admin/syllabi/{board_id}/{class_id}")
+async def create_or_update_syllabus(
+    board_id: str,
+    class_id: str,
+    data: dict = Body(...),
+    admin: dict = Depends(get_admin_user)
+):
+    """Create or update syllabus for a board+class."""
+    try:
+        if not await is_mongo_available():
+            raise HTTPException(status_code=503, detail="MongoDB unavailable")
+        
+        syllabus_doc = {
+            "board_id": board_id,
+            "class_id": class_id,
+            "content": data.get("content", ""),
+            "chapters": data.get("chapters", []),
+            "topics": data.get("topics", []),
+            "guidelines": data.get("guidelines", ""),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        
+        await db.syllabi.update_one(
+            {"board_id": board_id, "class_id": class_id},
+            {"$set": syllabus_doc},
+            upsert=True
+        )
+        
+        logger.info(f"Syllabus saved: {board_id}/{class_id}")
+        return {"message": "Syllabus saved successfully", "board_id": board_id, "class_id": class_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Save syllabus error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error saving syllabus: {e}")
+
+
+@api.delete("/admin/syllabi/{board_id}/{class_id}")
+async def delete_syllabus(
+    board_id: str,
+    class_id: str,
+    admin: dict = Depends(get_admin_user)
+):
+    """Delete syllabus for a board+class."""
+    try:
+        if not await is_mongo_available():
+            raise HTTPException(status_code=503, detail="MongoDB unavailable")
+        
+        await db.syllabi.delete_one({"board_id": board_id, "class_id": class_id})
+        logger.info(f"Syllabus deleted: {board_id}/{class_id}")
+        return {"message": "Syllabus deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Delete syllabus error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error deleting syllabus: {e}")
 
 # ─────────────────────────────────────────────
 # AI CHAT ROUTES

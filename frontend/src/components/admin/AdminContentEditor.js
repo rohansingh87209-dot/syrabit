@@ -3,7 +3,8 @@ import {
   Search, Plus, Save, Trash2, Upload, X, BookOpen, Loader2,
   FolderPlus, FilePlus, Edit2, FileText, File, Calendar,
   Book, HelpCircle, CheckCircle, Layers, Eye, FileUp,
-  ChevronRight, ChevronDown, GraduationCap, Building2, GitBranch, ArrowLeft
+  ChevronRight, ChevronDown, GraduationCap, Building2, GitBranch, ArrowLeft,
+  Scroll
 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
@@ -11,6 +12,7 @@ import { Viewer, Worker } from '@react-pdf-viewer/core';
 import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
+import AdminSyllabusManager from './AdminSyllabusManager';
 
 const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
 
@@ -171,6 +173,8 @@ function InlineCreator({ placeholder, onCreate, icon: Icon, color = 'violet' }) 
 }
 
 export default function AdminContentEditor({ adminToken }) {
+  const [activeTab, setActiveTab] = useState('content'); // 'content' | 'syllabus'
+  
   const [boards, setBoards] = useState([]);
   const [classes, setClasses] = useState([]);
   const [streams, setStreams] = useState([]);
@@ -394,10 +398,39 @@ export default function AdminContentEditor({ adminToken }) {
 
   return (
     <div className="h-full flex flex-col bg-[#06060e]">
+      {/* Tabs */}
+      <div className="border-b border-white/10" style={{ background: 'rgba(255,255,255,0.02)' }}>
+        <div className="h-14 flex items-center px-6 gap-6">
+          <button
+            onClick={() => setActiveTab('content')}
+            className={`flex items-center gap-2 pb-1 border-b-2 transition-colors font-medium text-sm ${
+              activeTab === 'content'
+                ? 'border-violet-500 text-violet-400'
+                : 'border-transparent text-white/50 hover:text-white'
+            }`}
+          >
+            <Layers size={16} />
+            Content Manager
+          </button>
+          <button
+            onClick={() => setActiveTab('syllabus')}
+            className={`flex items-center gap-2 pb-1 border-b-2 transition-colors font-medium text-sm ${
+              activeTab === 'syllabus'
+                ? 'border-indigo-500 text-indigo-400'
+                : 'border-transparent text-white/50 hover:text-white'
+            }`}
+          >
+            <Scroll size={16} />
+            Syllabus Manager
+          </button>
+        </div>
+      </div>
+
+      {/* Content Manager Tab */}
+      {activeTab === 'content' && (
+        <>
       <div className="h-14 border-b border-white/10 flex items-center justify-between px-6" style={{ background: 'rgba(255,255,255,0.02)' }}>
         <div className="flex items-center gap-2 min-w-0">
-          <Layers size={20} className="text-violet-400 flex-shrink-0" />
-          <h2 className="text-lg font-bold text-white flex-shrink-0">Content Manager</h2>
           {breadcrumb.length > 0 && (
             <div className="flex items-center gap-1 text-sm text-white/40 min-w-0 overflow-hidden">
               {breadcrumb.map((b, i) => (
@@ -654,6 +687,19 @@ export default function AdminContentEditor({ adminToken }) {
               </div>
             ) : null}
           </div>
+        </div>
+        </>
+      )}
+
+      {/* Syllabus Manager Tab */}
+      {activeTab === 'syllabus' && (
+        <div className="flex-1 overflow-y-auto p-6 max-w-4xl mx-auto w-full">
+          <AdminSyllabusManager
+            adminToken={adminToken}
+            boards={boards}
+            classes={classes}
+            streams={streams}
+          />
         </div>
       )}
 

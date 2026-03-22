@@ -63,17 +63,22 @@ Syrabit.ai is an AI-powered exam prep platform for AHSEC (Class 11-12) and Degre
 - Auth: signup, login, logout — dual Bearer token (localStorage) + cookie, works on both HTTP dev and HTTPS prod
 - Library: 50 AHSEC subjects across boards/classes/streams, chapter browser
 - AI Chat: fully functional via Groq (GPT-OSS-20B), native token-by-token streaming at max throughput (~240 tokens/sec), `<think>` tag filtering (cross-chunk safe), 6-message conversation history window, max_tokens=2048, with RAG, web search fallback, credit deduction
-- **RAG System (Library Search + Syllabus Injection)** ✅:
-  - `GET /api/library_search?board={board}&class={class}&subject={subject}&chapter={chapter}&query={text}` — Queries MongoDB library_scrapes collection, returns structured pages
-  - `GET /api/syllabi/{board_id}/{class_id}` — Fetches syllabus for board/class (no auth required)
-  - `POST /api/admin/syllabi/{board_id}/{class_id}` — Creates/updates syllabus (admin auth required)
-  - `DELETE /api/admin/syllabi/{board_id}/{class_id}` — Deletes syllabus (admin auth required)
-  - **Chat Endpoint Integration ✅**: Both `/ai/chat` and `/ai/chat/stream` now automatically:
+- **RAG System (Library Search + Syllabus Injection)** ✅ **COMPLETE**:
+  - `GET /api/library_search?board={board}&class={class}&subject={subject}&chapter={chapter}&query={text}` — Queries MongoDB library_scrapes collection
+  - `GET /api/syllabi/{board_id}/{class_id}` — Fetches syllabus for board/class (no auth)
+  - `POST /api/admin/syllabi/{board_id}/{class_id}` — Creates/updates syllabus (admin auth)
+  - `DELETE /api/admin/syllabi/{board_id}/{class_id}` — Deletes syllabus (admin auth)
+  - **Chat Endpoint Integration** ✅: Both `/ai/chat` and `/ai/chat/stream` automatically:
     1. Fetch syllabus for `board_id`/`class_id` from request
     2. Inject syllabus as Tier -1 grounding (curriculum constraints) into system prompt
-    3. Syllabus stays even when document/RAG content is present
-  - ChatMessage model updated with `board_id` and `class_id` fields for syllabus lookup
-  - Frontend integration TODO: enrich chat messages with board/class context before sending to backend (currently no board_id/class_id in chat requests)
+    3. Syllabus persists even when document/RAG content is present
+  - **Admin Syllabus Manager** ✅ (NEW): Tab in Content Editor to create/edit/delete syllabi:
+    - Select board + class → Add universal syllabus content
+    - Define key topics, chapters, learning guidelines
+    - Save → Automatically injected into all future chat answers for that board/class
+  - **Frontend Integration** ✅: ChatPage now sends `board_id`/`class_id` in every chat request
+    - Auto-injects user's board/class syllabus without requiring manual selection
+    - Syllabus applies to all students with matching profile
 - Frontend: MessageBubble memoized with React.memo, smooth auto-scroll with `behavior: 'smooth'`
 - Library page: Optimized with memoized enrichment (O(1) lookups via Maps), memoized filtering, SubjectCard memoized, **all PDF features removed for instant load**
 - UI/UX Design: **Professional startup aesthetic.** Animated mesh backgrounds (30s cycle, subtle radial gradients), grid overlay (70px pattern, 0.08 opacity), glassmorphism (10px blur + 1.2x saturate), glow borders (fade in on hover), 3D card lift (translateY -4px). All pages smooth with clean transitions (0.2-0.3s ease). AppLayout properly renders background elements for all pages.

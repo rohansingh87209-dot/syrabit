@@ -339,11 +339,13 @@ export default function ChatPage() {
     const payload = {
       message: text,
       conversation_id: conversationId,
-      subject_id:   subjectId   || null,
-      subject_name: subject?.name || null,
-      board_name:   user?.board_name  || null,
-      class_name:   user?.class_name  || null,
-      stream_name:  user?.stream_name || null,
+      subject_id:      subjectId    || null,
+      subject_name:    subject?.name || null,
+      board_id:        user?.board_id   || null,
+      board_name:      user?.board_name || null,
+      class_id:        user?.class_id   || null,
+      class_name:      user?.class_name || null,
+      stream_name:     user?.stream_name || null,
       model,
       // Tier 0 RAG: when user came from "Ask AI 📄" button on a card with document
       document_id: documentId || null,

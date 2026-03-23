@@ -4586,7 +4586,7 @@ async def admin_delete_roadmap_item(item_id: str, admin: dict = Depends(get_admi
 @api.get("/admin/activity-log")
 async def admin_get_activity_log(admin: dict = Depends(get_admin_user)):
     logs = await supa_get_activity_logs()
-    return logs
+    return {"logs": logs, "total": len(logs)}
 
 @api.post("/admin/activity-log")
 async def admin_log_activity(data: dict, admin: dict = Depends(get_admin_user)):

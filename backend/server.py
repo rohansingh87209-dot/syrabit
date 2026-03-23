@@ -293,7 +293,8 @@ def _get_content_cache(key: str):
     return None
 
 def _invalidate_content_cache(prefix: str):
-    keys_to_del = [k for k in _content_cache if k == prefix or k.startswith(f"{prefix}:")]
+    # Always also clear the composite library-bundle cache
+    keys_to_del = [k for k in _content_cache if k == prefix or k.startswith(f"{prefix}:") or k == "library-bundle"]
     for k in keys_to_del:
         _content_cache.pop(k, None)
         _content_cache_ttl.pop(k, None)
@@ -306,6 +307,8 @@ def _invalidate_content_cache(prefix: str):
         try:
             for rk in redis_client.scan_iter(f"{REDIS_CONTENT_PREFIX}{prefix}:*"):
                 redis_client.delete(rk)
+            # Also always delete library-bundle from Redis
+            redis_client.delete(f"{REDIS_CONTENT_PREFIX}library-bundle")
         except Exception:
             pass
 
@@ -3957,6 +3960,7 @@ async def admin_create_subject(data: SubjectCreate, admin: dict = Depends(get_ad
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         await db.subjects.insert_one(subj)
+        _invalidate_content_cache("subjects")
         return {k: v for k, v in subj.items() if k != "_id"}
     except HTTPException:
         raise
@@ -3973,6 +3977,7 @@ async def admin_update_subject(subject_id: str, data: dict, admin: dict = Depend
     result = await db.subjects.update_one({"id": subject_id}, {"$set": allowed})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Subject not found")
+    _invalidate_content_cache("subjects")
     return {"message": "Updated"}
 
 @api.patch("/admin/content/subjects/{subject_id}")
@@ -3985,6 +3990,7 @@ async def admin_patch_subject(subject_id: str, data: dict, admin: dict = Depends
     result = await db.subjects.update_one({"id": subject_id}, {"$set": allowed})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Subject not found")
+    _invalidate_content_cache("subjects")
     return {"message": "Subject updated"}
 
 
@@ -4021,6 +4027,8 @@ async def admin_delete_subject(subject_id: str, admin: dict = Depends(get_admin_
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Subject not found")
     await db.chapters.delete_many({"subject_id": subject_id})
+    _invalidate_content_cache("subjects")
+    _invalidate_content_cache("chapters")
     return {"message": "Deleted"}
 
 @api.post("/admin/content/chapters")
@@ -4060,6 +4068,8 @@ async def admin_create_chapter(data: ChapterCreate, admin: dict = Depends(get_ad
     
     result = {k: v for k, v in chap.items() if k != "_id"}
     result["chunks_created"] = len(chunks_created)
+    _invalidate_content_cache("chapters")
+    _invalidate_content_cache("subjects")
     return result
 
 @api.post("/admin/content/chunks")
@@ -4434,6 +4444,8 @@ async def admin_update_chapter(chapter_id: str, data: dict, admin: dict = Depend
             logger.error(f"❌ Re-chunking failed for chapter {chapter_id}: {chunk_error}")
             chunks_info = {"error": str(chunk_error)}
     
+    _invalidate_content_cache("chapters")
+    _invalidate_content_cache("subjects")
     return {"message": "Chapter updated", **chunks_info}
 
 @api.post("/admin/content/chapters/{chapter_id}/rechunk")
@@ -4584,6 +4596,8 @@ async def admin_delete_chapter(chapter_id: str, admin: dict = Depends(get_admin_
             {"id": chapter["subject_id"]},
             {"$inc": {"chapter_count": -1}}
         )
+    _invalidate_content_cache("chapters")
+    _invalidate_content_cache("subjects")
     return {"message": "Chapter deleted"}
 
 @api.post("/admin/seed")

@@ -12,6 +12,8 @@ import { Viewer, Worker } from '@react-pdf-viewer/core';
 import { defaultLayoutPlugin } from '@react-pdf-viewer/default-layout';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/default-layout/lib/styles/index.css';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import AdminSyllabusManager from './AdminSyllabusManager';
 
 const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
@@ -102,8 +104,10 @@ function ContentViewerPopup({ item, onClose }) {
             <div className="h-full overflow-y-auto" style={{ background: '#0a0a14' }}>
               <div className="p-8 max-w-4xl mx-auto">
                 {item.description && <p className="text-white/60 text-sm mb-6 pb-4 border-b border-white/10">{item.description}</p>}
-                <div className="prose prose-invert max-w-none text-white/90 whitespace-pre-wrap font-mono text-sm leading-relaxed">
-                  {item.content || 'No content available.'}
+                <div className="md-content max-w-none text-sm">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {item.content || '*No content available.*'}
+                  </ReactMarkdown>
                 </div>
               </div>
             </div>
@@ -466,25 +470,37 @@ export default function AdminContentEditor({ adminToken }) {
           </div>
         </div>
       ) : editView === 'new-chapter' || editView === 'edit-chapter' ? (
-        <div className="flex-1 overflow-y-auto p-8 max-w-3xl mx-auto w-full">
-          <button onClick={() => { setEditView(null); setEditTarget(null); }} className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white mb-6"><ArrowLeft size={16} /> Back</button>
-          <h3 className="text-2xl font-bold text-white mb-1">{editView === 'edit-chapter' ? 'Edit Chapter' : 'Create Chapter'}</h3>
-          <p className="text-white/50 text-sm mb-6">for {subjectData?.name}</p>
-          <div className="space-y-4">
-            <div>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Fixed header */}
+          <div className="px-8 pt-7 pb-4 flex-shrink-0">
+            <button onClick={() => { setEditView(null); setEditTarget(null); }} className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white mb-5"><ArrowLeft size={16} /> Back</button>
+            <h3 className="text-2xl font-bold text-white mb-0.5">{editView === 'edit-chapter' ? 'Edit Chapter' : 'Create Chapter'}</h3>
+            <p className="text-white/50 text-sm">for {subjectData?.name}</p>
+          </div>
+          {/* Scrollable form body that fills remaining space */}
+          <div className="flex-1 flex flex-col min-h-0 px-8 pb-8 gap-4">
+            <div className="flex-shrink-0">
               <label className="text-sm text-white/60 block mb-1.5">Title *</label>
               <input value={contentForm.title} onChange={(e) => setContentForm({ ...contentForm, title: e.target.value })} placeholder="Chapter title" className="w-full h-11 px-4 rounded-xl text-white bg-white/5 border border-white/10 outline-none focus:border-violet-500" />
             </div>
-            <div>
+            <div className="flex-shrink-0">
               <label className="text-sm text-white/60 block mb-1.5">Description</label>
               <textarea value={contentForm.description} onChange={(e) => setContentForm({ ...contentForm, description: e.target.value })} rows={2} placeholder="Brief description..." className="w-full px-4 py-3 rounded-xl text-white bg-white/5 border border-white/10 outline-none focus:border-violet-500 resize-none" />
             </div>
-            <div>
-              <label className="text-sm text-white/60 block mb-1.5">Content (Markdown)</label>
-              <textarea value={contentForm.content} onChange={(e) => setContentForm({ ...contentForm, content: e.target.value })} rows={14} placeholder="Write chapter content..." className="w-full px-4 py-3 rounded-xl text-white bg-white/5 border border-white/10 outline-none focus:border-violet-500 resize-none font-mono text-sm" />
-              <p className="text-xs text-white/30 mt-1">{contentForm.content.length} characters</p>
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm text-white/60">Content (Markdown)</label>
+                <span className="text-xs text-white/25">{contentForm.content.length} chars</span>
+              </div>
+              <textarea
+                value={contentForm.content}
+                onChange={(e) => setContentForm({ ...contentForm, content: e.target.value })}
+                placeholder={"# Chapter Title\n\nWrite your content here using **Markdown**.\n\n## Section\n- Bullet points\n- work great\n\n> Blockquotes for definitions\n\n```\nCode blocks supported\n```"}
+                className="flex-1 w-full px-4 py-3 rounded-xl text-white bg-white/5 border border-white/10 outline-none focus:border-violet-500 resize-none font-mono text-sm leading-relaxed"
+                style={{ minHeight: '200px' }}
+              />
             </div>
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3 flex-shrink-0">
               <button onClick={() => { setEditView(null); setEditTarget(null); }} className="flex-1 h-12 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium">Cancel</button>
               <button
                 onClick={editView === 'edit-chapter' ? handleUpdateChapter : handleCreateChapter}

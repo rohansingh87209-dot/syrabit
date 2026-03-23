@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import PageMeta from '@/components/seo/PageMeta';
 import { BookOpen, MessageSquare, Loader2, ArrowLeft, FileText, Calculator, BookMarked, HelpCircle, List } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { getSubject, getChapters, getChunks } from '@/utils/api';
@@ -199,9 +201,11 @@ export default function SubjectPage() {
                         <Loader2 size={20} className="animate-spin text-primary" />
                       </div>
                     ) : chapter.content ? (
-                      <div className="prose prose-invert max-w-none px-4 py-2">
-                        <div className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
-                          {chapter.content}
+                      <div className="px-4 py-2">
+                        <div className="md-content-light text-sm">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {chapter.content}
+                          </ReactMarkdown>
                         </div>
                       </div>
                     ) : (

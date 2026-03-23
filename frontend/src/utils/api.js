@@ -52,9 +52,10 @@ export const adminLogin = (email, password) =>
   axios.post(`${API_BASE}/admin/login`, { email, password }, { withCredentials: true });
 
 const adminHeaders = (token) => {
-  // If no token provided, rely on httpOnly cookie via withCredentials
-  // If token provided (for backward compatibility), use it in header
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  // Only send Authorization header if token is a real JWT (3 dot-separated segments)
+  // When adminToken is the 'verified' flag string, rely on the httpOnly cookie instead
+  const isRealJwt = token && typeof token === 'string' && token.split('.').length === 3;
+  return isRealJwt ? { Authorization: `Bearer ${token}` } : {};
 };
 
 export const adminVerify = (token) =>

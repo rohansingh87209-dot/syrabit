@@ -6,7 +6,8 @@ import axios from 'axios';
 const API = `${process.env.REACT_APP_BACKEND_URL || ''}/api`;
 
 function authHeaders(token) {
-  return { headers: token ? { Authorization: `Bearer ${token}` } : {}, withCredentials: true };
+  const isRealJwt = token && token.split('.').length === 3;
+  return { headers: isRealJwt ? { Authorization: `Bearer ${token}` } : {}, withCredentials: true };
 }
 
 export default function AdminSyllabusManager({ adminToken, boards = [], classes = [], streams = [] }) {
@@ -26,6 +27,7 @@ export default function AdminSyllabusManager({ adminToken, boards = [], classes 
   const [newTopic, setNewTopic] = useState('');
 
   // Fetch existing syllabi
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (selectedBoardId && selectedClassId) {
       fetchSyllabus();

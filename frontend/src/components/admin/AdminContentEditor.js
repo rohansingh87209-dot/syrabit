@@ -23,7 +23,8 @@ const CONTENT_TYPES = [
 ];
 
 function authHeaders(token) {
-  return { headers: token ? { Authorization: `Bearer ${token}` } : {}, withCredentials: true};
+  const isRealJwt = token && token.split('.').length === 3;
+  return { headers: isRealJwt ? { Authorization: `Bearer ${token}` } : {}, withCredentials: true };
 }
 
 const PDF_WORKER_URL = 'https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
@@ -302,20 +303,14 @@ export default function AdminContentEditor({ adminToken }) {
         // Use new PDF endpoint for PDF files
         if (file.name.toLowerCase().endsWith('.pdf')) {
           fd.append('title', file.name.replace(/\.[^/.]+$/, ''));
-          await axios.post(`${API}/admin/content/upload-pdf`, fd, { 
-            ...authHeaders(adminToken), 
-            headers: { ...authHeaders(adminToken).headers, 'Content-Type': 'multipart/form-data' } 
-          });
+          await axios.post(`${API}/admin/content/upload-pdf`, fd, authHeaders(adminToken));
         } else {
           // Use old endpoint for other files
           fd.append('content_type', contentType);
           fd.append('title', file.name.replace(/\.[^/.]+$/, ''));
           const ym = file.name.match(/20\d{2}/);
           if (ym) fd.append('year', ym[0]);
-          await axios.post(`${API}/admin/content/upload`, fd, { 
-            ...authHeaders(adminToken), 
-            headers: { ...authHeaders(adminToken).headers, 'Content-Type': 'multipart/form-data' } 
-          });
+          await axios.post(`${API}/admin/content/upload`, fd, authHeaders(adminToken));
         }
         ok++;
       } catch (err) {
